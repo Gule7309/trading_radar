@@ -439,6 +439,25 @@ export async function researchCandidate(
         `Publication gate failed: ${gate.reason}`,
       );
 
+      if (
+        (gate.reason === "CORE_CLAIM_DISCOVERY_ONLY" ||
+          gate.reason === "FINANCIAL_CORE_WITHOUT_PRIMARY" ||
+          gate.reason === "RISK_DISCOVERY_ONLY") &&
+        !isBudgetExceeded(state)
+      ) {
+        state.openQuestions.push({
+          questionId: `publication-gap-${state.budget.stepsUsed}`,
+          text: `Publication blocked by evidence quality: ${gate.reason}`,
+          evidenceNeed:
+            gate.reason === "FINANCIAL_CORE_WITHOUT_PRIMARY"
+              ? "Find a Tier-1 official source for the financial core claim."
+              : "Fetch the underlying web source so discovery-only evidence becomes directly inspectable.",
+          status: "OPEN",
+        });
+        state.phase = "RESEARCH";
+        continue;
+      }
+
       state.phase = "REJECTED";
       state.stopReason =
         gate.reason === "NO_CORE_CLAIM"
