@@ -178,6 +178,7 @@ export interface ResearchState {
   conflicts: ConflictItem[];
   budget: ResearchBudget;
   researchTrace: ResearchTraceStep[];
+  evidenceDirty?: boolean;
   diagnostics?: ResearchDiagnostic[];
   lastAction?: ResearchAction;
   stopReason?: StopReason;
