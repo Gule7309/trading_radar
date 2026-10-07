@@ -52,18 +52,29 @@ Implemented in the first skeleton:
 - mock end-to-end demo
 - publication gate and harness tests
 
-Not yet implemented:
+Implemented since the initial scaffold:
 
-- real TWSE / TPEx / MOPS adapters
-- real news search
-- claim extraction model call
-- numeric verifier
-- textual verifier
+- keyless TWSE / TPEx monthly revenue adapters
+- material disclosure normalization and adapters
+- provider-neutral dynamic news search contract
+- provider-neutral structured LLM contract
+- atomic claim extraction service
+- deterministic numeric verifier
+- isolated textual verifier
 - conflict detector
-- retry/fallback policy
-- conditional skeptic
-- thesis persistence / recheck
-- eval suite
+- source-grounded risk extractor
+- conditional skeptic service
+- verified-evidence thesis compiler
+- injectable verification pipeline
+- HTTP timeout / retry policy
+- CI typecheck + tests
+
+Still pending:
+
+- choose and wire a concrete LLM provider
+- choose and wire a concrete dynamic news/search provider
+- SQLite thesis persistence / recheck
+- full eval case suite and repeat-run reliability report
 
 ## Design sources
 
