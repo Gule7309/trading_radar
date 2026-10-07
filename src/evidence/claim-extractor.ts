@@ -17,15 +17,17 @@ export class LlmClaimExtractor implements ClaimExtractor {
   constructor(private readonly llm: LlmProvider) {}
 
   async extract(state: ResearchState): Promise<ExtractedClaim[]> {
-    const sourcePayload = state.sources.map((source) => ({
+    const sourcePayload = state.sources
+      .filter((source) => source.sourceTier <= 2)
+      .map((source) => ({
       sourceId: source.sourceId,
       sourceTier: source.sourceTier,
       sourceType: source.sourceType,
       title: source.title,
       publishedAt: source.publishedAt,
       dataPeriod: source.dataPeriod,
-      snippet: source.snippet,
-    }));
+        snippet: source.snippet,
+      }));
 
     const response = await this.llm.structured<unknown>({
       task: "CLAIM_EXTRACTION",
@@ -35,6 +37,7 @@ export class LlmClaimExtractor implements ClaimExtractor {
         "One claim should contain one proposition only.",
         "Keep company, period, metric, and attribution explicit.",
         "Attach only sourceIds that directly support the proposed claim.",
+        "Discovery-only Tier-3 search snippets are intentionally excluded from this task.",
         "Do not provide chain-of-thought.",
       ].join("\n"),
       input: {
