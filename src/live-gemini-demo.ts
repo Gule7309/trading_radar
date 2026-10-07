@@ -1,3 +1,4 @@
+import { loadEnvFile } from "node:process";
 import { CandidatePacketSchema } from "./domain/candidate.js";
 import { LlmResearchController } from "./agent/llm-controller.js";
 import { DefaultToolRouter } from "./tools/default-tool-router.js";
@@ -16,6 +17,12 @@ import {
 import { LlmSkeptic } from "./agent/skeptic.js";
 import { LlmThesisCompiler } from "./agent/thesis-compiler.js";
 import { researchCandidate } from "./harness/research-harness.js";
+
+try {
+  loadEnvFile(".env");
+} catch {
+  // Environment variables may already be supplied by the shell or CI.
+}
 
 const [ticker = "2330", companyName = "台積電", marketArg = "TWSE", industry = "半導體業"] =
   process.argv.slice(2);
