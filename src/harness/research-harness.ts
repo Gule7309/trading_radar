@@ -41,6 +41,7 @@ function initializeResearchState(candidate: CandidatePacket): ResearchState {
       startedAt: new Date().toISOString(),
     },
     researchTrace: [],
+    diagnostics: [],
     invalidationConditions: [],
   };
 }
@@ -209,21 +210,42 @@ function compileResult(
     })),
     verificationSummary: computeVerificationSummary(state),
     researchTrace: state.researchTrace,
+    diagnostics: state.diagnostics,
     stopReason,
     startedAt: state.budget.startedAt,
     completedAt: new Date().toISOString(),
   };
 }
 
+function describeError(error: unknown): string {
+  return error instanceof Error
+    ? error.message
+    : "Unknown model service failure.";
+}
+
+function addDiagnostic(
+  state: ResearchState,
+  stage: "CONTROLLER" | "VERIFICATION" | "SKEPTIC" | "THESIS",
+  error: unknown,
+): void {
+  state.diagnostics.push({
+    stage,
+    message: describeError(error),
+    createdAt: new Date().toISOString(),
+  });
+}
+
 function modelFailureResult(
   state: ResearchState,
   decision: ControllerDecision,
+  stage: "VERIFICATION" | "SKEPTIC" | "THESIS",
   error: unknown,
 ): ResearchResult {
+  addDiagnostic(state, stage, error);
   addTrace(
     state,
     decision,
-    error instanceof Error ? error.message : "Unknown model service failure.",
+    describeError(error),
   );
   state.phase = "REJECTED";
   state.stopReason = "MODEL_FAILURE";
@@ -255,6 +277,7 @@ export async function researchCandidate(
     try {
       decision = await controller.decide(state);
     } catch (error) {
+      addDiagnostic(state, "CONTROLLER", error);
       state.phase = "REJECTED";
       state.stopReason = "MODEL_FAILURE";
       return compileResult(state, "REJECTED", "REJECT", "MODEL_FAILURE");
@@ -319,7 +342,7 @@ export async function researchCandidate(
           buildBaselineClaimsFromSources(state);
         }
       } catch (error) {
-        return modelFailureResult(state, decision, error);
+        return modelFailureResult(state, decision, "VERIFICATION", error);
       }
 
       addTrace(state, decision, "Verification completed.");
@@ -362,7 +385,7 @@ export async function researchCandidate(
         state.phase = "SKEPTIC";
         continue;
       } catch (error) {
-        return modelFailureResult(state, decision, error);
+        return modelFailureResult(state, decision, "VERIFICATION", error);
       }
     }
 
@@ -394,7 +417,7 @@ export async function researchCandidate(
               keyReasons: compilation.keyReasons,
             };
           } catch (error) {
-            return modelFailureResult(state, decision, error);
+            return modelFailureResult(state, decision, "THESIS", error);
           }
         }
 
