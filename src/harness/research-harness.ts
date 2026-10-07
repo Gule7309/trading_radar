@@ -7,10 +7,22 @@ import type {
   ResearchState,
   StopReason,
 } from "../domain/research.js";
-import type { ResearchController } from "../agent/controller.js";
+import type {
+  ControllerDecision,
+  ResearchController,
+} from "../agent/controller.js";
 import type { ResearchToolRouter } from "../tools/tool-router.js";
+import type { VerificationPipeline } from "../evidence/verification-pipeline.js";
+import type { Skeptic } from "../agent/skeptic.js";
+import type { ThesisCompiler } from "../agent/thesis-compiler.js";
 import { DEFAULT_RESEARCH_BUDGET, isBudgetExceeded } from "./budgets.js";
 import { evaluatePublicationGate } from "./publication-gate.js";
+
+export interface ResearchHarnessServices {
+  verificationPipeline?: VerificationPipeline;
+  skeptic?: Skeptic;
+  thesisCompiler?: ThesisCompiler;
+}
 
 function initializeResearchState(candidate: CandidatePacket): ResearchState {
   return {
@@ -33,23 +45,25 @@ function initializeResearchState(candidate: CandidatePacket): ResearchState {
   };
 }
 
+function actionDetail(action: ResearchAction): string | undefined {
+  if (action.type === "SEARCH_OFFICIAL") return action.dataset;
+  if (action.type === "SEARCH_NEWS") return action.query;
+  if (action.type === "FETCH_SOURCE") return action.sourceId;
+  return undefined;
+}
+
 function addTrace(
   state: ResearchState,
-  action: ResearchAction,
+  decision: ControllerDecision,
   outcome: string,
-  reasonCode: string,
   tool?: string,
 ): void {
   state.researchTrace.push({
     step: state.budget.stepsUsed,
-    action: action.type,
-    actionDetail:
-      action.type === "SEARCH_OFFICIAL"
-        ? action.dataset
-        : action.type === "SEARCH_NEWS"
-          ? action.query
-          : undefined,
-    reasonCode,
+    action: decision.action.type,
+    actionDetail: actionDetail(decision.action),
+    reasonCode: decision.reasonCode,
+    decisionSummary: decision.summary,
     tool,
     outcome,
     createdAt: new Date().toISOString(),
@@ -71,7 +85,11 @@ function incrementBudget(state: ResearchState, action: ResearchAction): void {
 function buildBaselineClaimsFromSources(state: ResearchState): void {
   if (state.claims.length > 0) return;
 
-  const official = state.sources.find((source) => source.sourceTier === 1);
+  const official = state.sources.find(
+    (source) =>
+      source.sourceTier === 1 &&
+      typeof source.metadata?.yearOverYearPercent === "number",
+  );
   const claims: Claim[] = [];
 
   if (official) {
@@ -137,6 +155,10 @@ function compileResult(
   status: ResearchResult["status"],
   decision: ResearchResult["decision"],
   stopReason: StopReason,
+  overrides?: {
+    thesis?: string;
+    keyReasons?: string[];
+  },
 ): ResearchResult {
   const sourceIdsByClaim = new Map<string, string[]>();
 
@@ -154,11 +176,14 @@ function compileResult(
     decision,
     thesis:
       status === "PUBLISHABLE"
-        ? `${state.candidate.companyName} merits further research because its recent operating signal is supported by verified evidence while identified downside risks remain monitorable.`
+        ? overrides?.thesis ??
+          `${state.candidate.companyName} merits further research because its recent operating signal is supported by verified evidence while identified downside risks remain monitorable.`
         : undefined,
-    keyReasons: state.claims
-      .filter((claim) => claim.status === "SUPPORTED")
-      .map((claim) => claim.text),
+    keyReasons:
+      overrides?.keyReasons ??
+      state.claims
+        .filter((claim) => claim.status === "SUPPORTED")
+        .map((claim) => claim.text),
     claims: state.claims.map((claim) => ({
       claimId: claim.claimId,
       text: claim.text,
@@ -188,10 +213,26 @@ function compileResult(
   };
 }
 
+function modelFailureResult(
+  state: ResearchState,
+  decision: ControllerDecision,
+  error: unknown,
+): ResearchResult {
+  addTrace(
+    state,
+    decision,
+    error instanceof Error ? error.message : "Unknown model service failure.",
+  );
+  state.phase = "REJECTED";
+  state.stopReason = "MODEL_FAILURE";
+  return compileResult(state, "REJECTED", "REJECT", "MODEL_FAILURE");
+}
+
 export async function researchCandidate(
   candidate: CandidatePacket,
   controller: ResearchController,
   toolRouter: ResearchToolRouter,
+  services: ResearchHarnessServices = {},
 ): Promise<ResearchResult> {
   const state = initializeResearchState(candidate);
 
@@ -207,7 +248,17 @@ export async function researchCandidate(
       );
     }
 
-    const action = await controller.decide(state);
+    let decision: ControllerDecision;
+
+    try {
+      decision = await controller.decide(state);
+    } catch (error) {
+      state.phase = "REJECTED";
+      state.stopReason = "MODEL_FAILURE";
+      return compileResult(state, "REJECTED", "REJECT", "MODEL_FAILURE");
+    }
+
+    const action = decision.action;
     state.lastAction = action;
     incrementBudget(state, action);
 
@@ -224,13 +275,7 @@ export async function researchCandidate(
       state.knownFacts.push(...(observation.knownFacts ?? []));
       state.risks.push(...(observation.risks ?? []));
 
-      addTrace(
-        state,
-        action,
-        observation.summary,
-        observation.outcome,
-        action.type,
-      );
+      addTrace(state, decision, observation.summary, action.type);
 
       if (observation.outcome === "ERROR") {
         state.phase = "REJECTED";
@@ -243,32 +288,64 @@ export async function researchCandidate(
     }
 
     if (action.type === "VERIFY") {
-      buildBaselineClaimsFromSources(state);
-      addTrace(
-        state,
-        action,
-        "Baseline verification completed.",
-        "VERIFICATION_COMPLETE",
-      );
+      try {
+        if (services.verificationPipeline) {
+          await services.verificationPipeline.run(state);
+        } else {
+          buildBaselineClaimsFromSources(state);
+        }
+      } catch (error) {
+        return modelFailureResult(state, decision, error);
+      }
+
+      addTrace(state, decision, "Verification completed.");
       state.phase = "VERIFY";
       continue;
     }
 
     if (action.type === "RUN_SKEPTIC") {
-      addTrace(
-        state,
-        action,
-        "Skeptic stage is scaffolded but not implemented in P0.",
-        "SKEPTIC_SKIPPED",
-      );
-      state.phase = "SKEPTIC";
-      continue;
+      if (!services.skeptic) {
+        addTrace(
+          state,
+          decision,
+          "Skeptic stage requested but no skeptic service is configured.",
+        );
+        state.phase = "SKEPTIC";
+        continue;
+      }
+
+      try {
+        const result = await services.skeptic.review(
+          state,
+          action.thesisDraft,
+        );
+
+        if (result.shouldSearch) {
+          state.openQuestions.push({
+            questionId: `skeptic-${state.budget.skepticRounds}`,
+            text: result.falsificationQuestion,
+            evidenceNeed: result.suggestedQuery,
+            status: "OPEN",
+          });
+        }
+
+        addTrace(
+          state,
+          decision,
+          `Skeptic: ${result.weakness}`,
+          "SKEPTIC",
+        );
+        state.phase = "SKEPTIC";
+        continue;
+      } catch (error) {
+        return modelFailureResult(state, decision, error);
+      }
     }
 
     if (action.type === "REJECT") {
       state.phase = "REJECTED";
       state.stopReason = action.reason;
-      addTrace(state, action, action.reason, "CONTROLLER_REJECT");
+      addTrace(state, decision, action.reason);
       return compileResult(state, "REJECTED", "REJECT", action.reason);
     }
 
@@ -276,17 +353,43 @@ export async function researchCandidate(
       const gate = evaluatePublicationGate(state);
 
       if (gate.ok) {
+        let overrides:
+          | {
+              thesis?: string;
+              keyReasons?: string[];
+            }
+          | undefined;
+
+        if (services.thesisCompiler) {
+          try {
+            const compilation = await services.thesisCompiler.compile(state);
+            state.invalidationConditions =
+              compilation.invalidationConditions;
+            overrides = {
+              thesis: compilation.thesis,
+              keyReasons: compilation.keyReasons,
+            };
+          } catch (error) {
+            return modelFailureResult(state, decision, error);
+          }
+        }
+
         state.phase = "DONE";
         state.stopReason = "PUBLISHED";
-        addTrace(state, action, "Publication gate passed.", "PUBLISHED");
-        return compileResult(state, "PUBLISHABLE", "KEEP", "PUBLISHED");
+        addTrace(state, decision, "Publication gate passed.");
+        return compileResult(
+          state,
+          "PUBLISHABLE",
+          "KEEP",
+          "PUBLISHED",
+          overrides,
+        );
       }
 
       addTrace(
         state,
-        action,
+        decision,
         `Publication gate failed: ${gate.reason}`,
-        gate.reason,
       );
 
       state.phase = "REJECTED";
