@@ -151,6 +151,7 @@ export interface ResearchBudget {
 export interface ResearchTraceStep {
   step: number;
   action: ResearchAction["type"];
+  actionDetail?: string;
   reasonCode: string;
   tool?: string;
   outcome: string;
