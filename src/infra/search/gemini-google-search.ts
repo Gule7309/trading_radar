@@ -124,7 +124,6 @@ export class GeminiGoogleSearchProvider implements SearchProvider {
         "Return a concise synthesis grounded in the retrieved sources.",
       config: {
         tools: [{ googleSearch: {} }],
-        temperature: 0,
       },
     });
 
