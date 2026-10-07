@@ -62,18 +62,22 @@ function incrementBudget(state: ResearchState, action: ResearchAction): void {
   }
 }
 
-function buildMockClaimsFromSources(state: ResearchState): void {
+function buildBaselineClaimsFromSources(state: ResearchState): void {
   if (state.claims.length > 0) return;
 
   const official = state.sources.find((source) => source.sourceTier === 1);
-  const news = state.sources.find((source) => source.sourceType === "NEWS");
-
   const claims: Claim[] = [];
 
   if (official) {
+    const yoy = official.metadata?.yearOverYearPercent;
+    const period = official.dataPeriod;
+
     claims.push({
       claimId: "claim-core-1",
-      text: "Recent revenue performance is supported by an official disclosure.",
+      text:
+        typeof yoy === "number"
+          ? `${period ?? "Latest period"} monthly revenue YoY was ${yoy}%.`
+          : "Recent revenue performance is supported by an official disclosure.",
       category: "FINANCIAL",
       importance: "CORE",
       status: "SUPPORTED",
@@ -85,23 +89,14 @@ function buildMockClaimsFromSources(state: ResearchState): void {
       sourceId: official.sourceId,
       evidenceText: official.snippet,
       verificationResult: "SUPPORTED",
-      verifierReason: "Mock verifier: official evidence supports the claim.",
+      verifierReason:
+        "Baseline deterministic mapping from a normalized Tier-1 official source.",
     });
   }
 
-  if (news) {
-    state.risks.push({
-      riskId: "risk-1",
-      title: "Margin pressure",
-      explanation: "Recent secondary reporting indicates margin pressure.",
-      sourceIds: [news.sourceId],
-    });
-  }
-
-  state.claims.push(...claims);
   state.invalidationConditions = [
     "A new official disclosure materially reverses the recent revenue trend.",
-    "Margin deterioration becomes persistent across subsequent reporting periods.",
+    "A verified risk materially contradicts the core growth assumption.",
   ];
 }
 
@@ -153,7 +148,7 @@ function compileResult(
     decision,
     thesis:
       status === "PUBLISHABLE"
-        ? `${state.candidate.companyName} merits further research because its recent operating signal is supported by verified evidence, while margin pressure remains a material risk.`
+        ? `${state.candidate.companyName} merits further research because its recent operating signal is supported by verified evidence while identified downside risks remain monitorable.`
         : undefined,
     keyReasons: state.claims
       .filter((claim) => claim.status === "SUPPORTED")
@@ -176,6 +171,7 @@ function compileResult(
       url: source.url,
       publisher: source.publisher,
       publishedAt: source.publishedAt,
+      dataPeriod: source.dataPeriod,
       sourceTier: source.sourceTier,
     })),
     verificationSummary: computeVerificationSummary(state),
@@ -214,8 +210,14 @@ export async function researchCandidate(
       action.type === "SEARCH_NEWS" ||
       action.type === "FETCH_SOURCE"
     ) {
-      const observation = await toolRouter.execute(action);
+      const observation = await toolRouter.execute(action, {
+        candidate: state.candidate,
+      });
+
       state.sources.push(...(observation.sources ?? []));
+      state.knownFacts.push(...(observation.knownFacts ?? []));
+      state.risks.push(...(observation.risks ?? []));
+
       addTrace(
         state,
         action,
@@ -235,11 +237,11 @@ export async function researchCandidate(
     }
 
     if (action.type === "VERIFY") {
-      buildMockClaimsFromSources(state);
+      buildBaselineClaimsFromSources(state);
       addTrace(
         state,
         action,
-        "Mock verification completed.",
+        "Baseline verification completed.",
         "VERIFICATION_COMPLETE",
       );
       state.phase = "VERIFY";
