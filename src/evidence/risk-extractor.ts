@@ -12,7 +12,7 @@ export class LlmRiskExtractor implements RiskExtractor {
 
   async extract(state: ResearchState): Promise<RiskItem[]> {
     const response = await this.llm.structured<unknown>({
-      task: "CLAIM_EXTRACTION",
+      task: "RISK_EXTRACTION",
       system: [
         "Extract material downside risks that are explicitly grounded in the supplied sources.",
         "Do not invent generic investment risks.",
