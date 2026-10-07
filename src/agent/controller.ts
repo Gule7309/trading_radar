@@ -6,13 +6,37 @@ export interface ResearchController {
 
 export class MockResearchController implements ResearchController {
   async decide(state: ResearchState): Promise<ResearchAction> {
-    if (state.sources.length === 0) {
+    const hasMonthlyRevenue = state.sources.some(
+      (source) =>
+        source.sourceTier === 1 &&
+        typeof source.metadata?.yearOverYearPercent === "number",
+    );
+
+    if (!hasMonthlyRevenue) {
       return {
         type: "SEARCH_OFFICIAL",
         dataset: "MONTHLY_REVENUE",
         purpose: "Validate the primary quant signal with a first-party source.",
         query: `${state.candidate.ticker} latest monthly revenue`,
         evidenceNeed: "Primary evidence for recent revenue performance.",
+      };
+    }
+
+    const hasMaterialDisclosureSearch = state.researchTrace.some(
+      (step) =>
+        step.action === "SEARCH_OFFICIAL" &&
+        step.reasonCode === "MATERIAL_DISCLOSURE_SEARCH",
+    );
+
+    if (!hasMaterialDisclosureSearch) {
+      return {
+        type: "SEARCH_OFFICIAL",
+        dataset: "MATERIAL_DISCLOSURES",
+        purpose:
+          "Check recent first-party company disclosures for events that may alter the thesis.",
+        query: `${state.candidate.ticker} latest material disclosures`,
+        evidenceNeed:
+          "Recent company-specific events, guidance, one-off factors, or risk signals.",
       };
     }
 
