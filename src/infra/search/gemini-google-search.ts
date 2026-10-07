@@ -79,10 +79,17 @@ export function extractGroundedSearchResults(
       text.slice(0, 500).trim() ||
       "Grounded Google Search source.";
 
+    const groundingTitle = chunk.web?.title?.trim();
+    const redirectPublisher = publisherFromUrl(url);
+    const publisher =
+      groundingTitle && /^[a-z0-9.-]+\.[a-z]{2,}$/i.test(groundingTitle)
+        ? groundingTitle.replace(/^www\./, "")
+        : redirectPublisher;
+
     results.push({
-      title: chunk.web?.title?.trim() || publisherFromUrl(url) || url,
+      title: groundingTitle || redirectPublisher || url,
       url,
-      publisher: publisherFromUrl(url),
+      publisher,
       snippet,
     });
   });
