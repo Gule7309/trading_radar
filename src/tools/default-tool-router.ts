@@ -58,6 +58,31 @@ function buildMonthlyRevenueFact(
   };
 }
 
+function classifyFetchedSource(
+  url: string,
+): { sourceTier: 1 | 2; sourceType: SourceDocument["sourceType"] } {
+  let hostname = "";
+
+  try {
+    hostname = new URL(url).hostname.toLowerCase().replace(/^www\./, "");
+  } catch {
+    return { sourceTier: 2, sourceType: "OTHER" };
+  }
+
+  if (
+    hostname === "openapi.twse.com.tw" ||
+    hostname.endsWith(".twse.com.tw")
+  ) {
+    return { sourceTier: 1, sourceType: "TWSE" };
+  }
+
+  if (hostname === "www.tpex.org.tw" || hostname.endsWith(".tpex.org.tw")) {
+    return { sourceTier: 1, sourceType: "TPEX" };
+  }
+
+  return { sourceTier: 2, sourceType: "NEWS" };
+}
+
 function searchResultToSource(
   result: Awaited<ReturnType<SearchProvider["search"]>>[number],
   ticker: string,
@@ -90,7 +115,7 @@ function searchResultToSource(
     title: result.title,
     publisher,
     sourceType: "NEWS",
-    sourceTier: 2,
+    sourceTier: 3,
     publishedAt: result.publishedAt,
     retrievedAt: new Date().toISOString(),
     ticker,
@@ -201,6 +226,7 @@ export class DefaultToolRouter implements ResearchToolRouter {
 
       try {
         const fetched = await this.sourceFetcher(knownSource.url);
+        const classification = classifyFetchedSource(fetched.url);
 
         return {
           outcome: "SUCCESS",
@@ -209,14 +235,18 @@ export class DefaultToolRouter implements ResearchToolRouter {
             {
               ...fetched,
               sourceId: `${knownSource.sourceId}-full`,
-              sourceTier: knownSource.sourceTier,
-              sourceType: knownSource.sourceType,
-              publisher: knownSource.publisher || fetched.publisher,
-              publishedAt: knownSource.publishedAt ?? fetched.publishedAt,
+              sourceTier: classification.sourceTier,
+              sourceType: classification.sourceType,
+              publisher:
+                fetched.publisher ||
+                knownSource.publisher ||
+                "Unknown publisher",
+              publishedAt: fetched.publishedAt ?? knownSource.publishedAt,
               ticker: context.candidate.ticker,
               metadata: {
                 ...(fetched.metadata ?? {}),
                 parentSourceId: knownSource.sourceId,
+                discoveryPublisher: knownSource.publisher,
               },
             },
           ],
