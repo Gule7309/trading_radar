@@ -160,6 +160,12 @@ export interface ResearchTraceStep {
   createdAt: string;
 }
 
+export interface ResearchDiagnostic {
+  stage: "CONTROLLER" | "VERIFICATION" | "SKEPTIC" | "THESIS";
+  message: string;
+  createdAt: string;
+}
+
 export interface ResearchState {
   runId: string;
   candidate: CandidatePacket;
@@ -173,6 +179,7 @@ export interface ResearchState {
   conflicts: ConflictItem[];
   budget: ResearchBudget;
   researchTrace: ResearchTraceStep[];
+  diagnostics: ResearchDiagnostic[];
   lastAction?: ResearchAction;
   stopReason?: StopReason;
   invalidationConditions: string[];
@@ -213,6 +220,7 @@ export interface ResearchResult {
     unresolvedConflicts: number;
   };
   researchTrace: ResearchTraceStep[];
+  diagnostics: ResearchDiagnostic[];
   stopReason: StopReason;
   startedAt: string;
   completedAt: string;
