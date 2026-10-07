@@ -22,6 +22,7 @@ export type StopReason =
   | "UNRESOLVED_CONFLICT"
   | "BUDGET_EXHAUSTED"
   | "SOURCE_FAILURE"
+  | "MODEL_FAILURE"
   | "NO_CORE_CLAIM"
   | "NO_RISK_IDENTIFIED"
   | "UNKNOWN";
@@ -153,6 +154,7 @@ export interface ResearchTraceStep {
   action: ResearchAction["type"];
   actionDetail?: string;
   reasonCode: string;
+  decisionSummary?: string;
   tool?: string;
   outcome: string;
   createdAt: string;
