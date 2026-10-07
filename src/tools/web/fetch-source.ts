@@ -9,17 +9,17 @@ export interface FetchSourceOptions {
 
 export class UnsafeFetchTargetError extends Error {
   constructor(public readonly reason: string) {
-    super(`Fetch target rejected by URL policy: ${reason}`);
+    super("Fetch target rejected by URL policy: " + reason);
     this.name = "UnsafeFetchTargetError";
   }
 }
 
 function htmlToPlainText(html: string): string {
   return html
-    .replace(/<!--([\\s\\S]*?)-->/g, " ")
-    .replace(/<script\\b[^>]*>[\\s\\S]*?<\\/script>/gi, " ")
-    .replace(/<style\\b[^>]*>[\\s\\S]*?<\\/style>/gi, " ")
-    .replace(/<noscript\\b[^>]*>[\\s\\S]*?<\\/noscript>/gi, " ")
+    .replace(/<!--([\s\S]*?)-->/g, " ")
+    .replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, " ")
+    .replace(/<style\b[^>]*>[\s\S]*?<\/style>/gi, " ")
+    .replace(/<noscript\b[^>]*>[\s\S]*?<\/noscript>/gi, " ")
     .replace(/<[^>]+>/g, " ")
     .replace(/&nbsp;/gi, " ")
     .replace(/&amp;/gi, "&")
@@ -27,12 +27,12 @@ function htmlToPlainText(html: string): string {
     .replace(/&gt;/gi, ">")
     .replace(/&quot;/gi, '"')
     .replace(/&#39;/gi, "'")
-    .replace(/\\s+/g, " ")
+    .replace(/\s+/g, " ")
     .trim();
 }
 
 function extractTitle(html: string): string | undefined {
-  const match = html.match(/<title[^>]*>([\\s\\S]*?)<\\/title>/i);
+  const match = html.match(/<title[^>]*>([\s\S]*?)<\/title>/i);
   return match ? htmlToPlainText(match[1] ?? "") : undefined;
 }
 
@@ -64,13 +64,13 @@ export async function fetchExternalSource(
 
     if (!response.ok) {
       throw new Error(
-        `HTTP ${response.status} while fetching ${policy.normalizedUrl}`,
+        "HTTP " + response.status + " while fetching " + policy.normalizedUrl,
       );
     }
 
     const contentLength = Number(response.headers.get("content-length"));
     if (Number.isFinite(contentLength) && contentLength > maxBytes) {
-      throw new Error(`Source exceeds ${maxBytes} byte fetch limit.`);
+      throw new Error("Source exceeds " + maxBytes + " byte fetch limit.");
     }
 
     const raw = await response.text();
@@ -78,7 +78,7 @@ export async function fetchExternalSource(
     const contentType = response.headers.get("content-type") ?? "";
     const text = contentType.includes("html")
       ? htmlToPlainText(limited)
-      : limited.replace(/\\s+/g, " ").trim();
+      : limited.replace(/\s+/g, " ").trim();
 
     if (!text) {
       throw new Error("Fetched source contains no usable text.");
@@ -88,18 +88,18 @@ export async function fetchExternalSource(
     const finalPolicy = validateExternalHttpUrl(finalUrl);
     if (!finalPolicy.allowed) {
       throw new UnsafeFetchTargetError(
-        `REDIRECT_${finalPolicy.reason ?? "UNSAFE"}`,
+        "REDIRECT_" + (finalPolicy.reason ?? "UNSAFE"),
       );
     }
 
     const hostname = new URL(finalUrl).hostname;
     const hash = createHash("sha256")
-      .update(`${finalUrl}\\n${text}`)
+      .update(finalUrl + "\n" + text)
       .digest("hex")
       .slice(0, 20);
 
     return {
-      sourceId: `web-${hash}`,
+      sourceId: "web-" + hash,
       url: finalUrl,
       title: extractTitle(limited) ?? hostname,
       publisher: hostname,
