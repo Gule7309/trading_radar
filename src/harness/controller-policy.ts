@@ -31,6 +31,16 @@ export function enforceControllerPolicy(
   );
 
   if (
+    state.evidenceDirty &&
+    state.claims.length > 0 &&
+    (action.type === "FINALIZE" || action.type === "RUN_SKEPTIC")
+  ) {
+    return forceVerify(
+      "New direct evidence arrived after the previous verification pass; verify it before skeptic review or publication.",
+    );
+  }
+
+  if (
     state.claims.length === 0 &&
     hasPrimarySource &&
     hasFetchedSecondarySource &&
