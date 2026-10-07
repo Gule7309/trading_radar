@@ -118,6 +118,8 @@ function buildBaselineClaimsFromSources(state: ResearchState): void {
     });
   }
 
+  state.claims.push(...claims);
+
   state.invalidationConditions = [
     "A new official disclosure materially reverses the recent revenue trend.",
     "A verified risk materially contradicts the core growth assumption.",
