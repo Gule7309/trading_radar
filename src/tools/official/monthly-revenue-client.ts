@@ -84,10 +84,25 @@ export async function fetchLatestMonthlyRevenue(
     sourceType: market,
     sourceTier: 1,
     publishedAt: record.tableDate,
+    dataPeriod: record.period,
     retrievedAt: response.retrievedAt,
     ticker: record.ticker,
     snippet: snippetParts.join("；"),
     contentHash: sourceId,
+    metadata: {
+      monthlyRevenueTwdThousands: record.monthlyRevenueTwdThousands ?? null,
+      previousMonthRevenueTwdThousands:
+        record.previousMonthRevenueTwdThousands ?? null,
+      previousYearMonthRevenueTwdThousands:
+        record.previousYearMonthRevenueTwdThousands ?? null,
+      monthOverMonthPercent: record.monthOverMonthPercent ?? null,
+      yearOverYearPercent: record.yearOverYearPercent ?? null,
+      cumulativeRevenueTwdThousands:
+        record.cumulativeRevenueTwdThousands ?? null,
+      cumulativeYearOverYearPercent:
+        record.cumulativeYearOverYearPercent ?? null,
+      tableDate: record.tableDate ?? null,
+    },
     untrustedContent: true,
   };
 
