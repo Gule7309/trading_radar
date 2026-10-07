@@ -9,8 +9,9 @@ export class MockResearchController implements ResearchController {
     if (state.sources.length === 0) {
       return {
         type: "SEARCH_OFFICIAL",
+        dataset: "MONTHLY_REVENUE",
         purpose: "Validate the primary quant signal with a first-party source.",
-        query: `${state.candidate.ticker} latest revenue disclosure`,
+        query: `${state.candidate.ticker} latest monthly revenue`,
         evidenceNeed: "Primary evidence for recent revenue performance.",
       };
     }
