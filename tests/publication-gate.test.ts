@@ -19,7 +19,36 @@ function baseState(): ResearchState {
     phase: "VERIFY",
     knownFacts: [],
     openQuestions: [],
-    sources: [],
+    sources: [
+      {
+        sourceId: "official-1",
+        url: "https://openapi.twse.com.tw/example",
+        title: "Official financial source",
+        publisher: "TWSE",
+        sourceType: "TWSE",
+        sourceTier: 1,
+        publishedAt: "2026-10-06",
+        retrievedAt: "2026-10-07T00:00:00Z",
+        ticker: "TEST",
+        snippet: "Revenue growth was positive.",
+        contentHash: "official",
+        untrustedContent: true,
+      },
+      {
+        sourceId: "risk-1-source",
+        url: "https://example.com/risk",
+        title: "Fetched risk source",
+        publisher: "example.com",
+        sourceType: "NEWS",
+        sourceTier: 2,
+        publishedAt: "2026-10-06",
+        retrievedAt: "2026-10-07T00:00:00Z",
+        ticker: "TEST",
+        snippet: "Margin pressure increased.",
+        contentHash: "risk",
+        untrustedContent: true,
+      },
+    ],
     claims: [
       {
         claimId: "claim-1",
@@ -29,13 +58,22 @@ function baseState(): ResearchState {
         status: "SUPPORTED",
       },
     ],
-    evidence: [],
+    evidence: [
+      {
+        evidenceId: "e1",
+        claimId: "claim-1",
+        sourceId: "official-1",
+        evidenceText: "Revenue growth was positive.",
+        verificationResult: "SUPPORTED",
+        verifierReason: "Official evidence supports the claim.",
+      },
+    ],
     risks: [
       {
         riskId: "risk-1",
         title: "Risk",
         explanation: "Material risk",
-        sourceIds: [],
+        sourceIds: ["risk-1-source"],
       },
     ],
     conflicts: [],
@@ -65,6 +103,36 @@ describe("evaluatePublicationGate", () => {
     expect(evaluatePublicationGate(state)).toEqual({
       ok: false,
       reason: "UNSUPPORTED_CORE_CLAIM",
+    });
+  });
+
+  it("rejects discovery-only core claim evidence", () => {
+    const state = baseState();
+    state.sources[0]!.sourceTier = 3;
+
+    expect(evaluatePublicationGate(state)).toEqual({
+      ok: false,
+      reason: "CORE_CLAIM_DISCOVERY_ONLY",
+    });
+  });
+
+  it("requires primary evidence for financial core claims", () => {
+    const state = baseState();
+    state.sources[0]!.sourceTier = 2;
+
+    expect(evaluatePublicationGate(state)).toEqual({
+      ok: false,
+      reason: "FINANCIAL_CORE_WITHOUT_PRIMARY",
+    });
+  });
+
+  it("rejects discovery-only risk evidence", () => {
+    const state = baseState();
+    state.sources[1]!.sourceTier = 3;
+
+    expect(evaluatePublicationGate(state)).toEqual({
+      ok: false,
+      reason: "RISK_DISCOVERY_ONLY",
     });
   });
 
