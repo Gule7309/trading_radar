@@ -14,6 +14,8 @@ export interface ToolExecutionContext {
 export interface ToolObservation {
   outcome: "SUCCESS" | "EMPTY" | "ERROR";
   summary: string;
+  failureCode?: string;
+  retryable?: boolean;
   sources?: SourceDocument[];
   knownFacts?: KnownFact[];
   risks?: RiskItem[];
