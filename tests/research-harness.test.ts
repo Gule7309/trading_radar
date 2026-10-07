@@ -30,7 +30,7 @@ describe("researchCandidate", () => {
       new MockToolRouter(),
     );
 
-    expect(result.status).toBe("PUBLISHABLE");
+    expect(result.status, JSON.stringify(result, null, 2)).toBe("PUBLISHABLE");
     expect(result.decision).toBe("KEEP");
     expect(result.verificationSummary.coreClaimCoverage).toBe(1);
     expect(result.risks.length).toBeGreaterThan(0);
