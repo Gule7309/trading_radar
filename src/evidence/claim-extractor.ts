@@ -3,7 +3,7 @@ import type { ResearchState } from "../domain/research.js";
 import type { LlmProvider } from "../infra/llm/provider.js";
 import {
   ClaimExtractionOutputSchema,
-  type ExtractedClaimSchema,
+  ExtractedClaimSchema,
 } from "../agent/model-schemas.js";
 import type { z } from "zod";
 
