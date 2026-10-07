@@ -17,6 +17,7 @@ import type { Skeptic } from "../agent/skeptic.js";
 import type { ThesisCompiler } from "../agent/thesis-compiler.js";
 import { DEFAULT_RESEARCH_BUDGET, isBudgetExceeded } from "./budgets.js";
 import { evaluatePublicationGate } from "./publication-gate.js";
+import { enforceControllerPolicy } from "./controller-policy.js";
 
 export interface ResearchHarnessServices {
   verificationPipeline?: VerificationPipeline;
@@ -282,6 +283,8 @@ export async function researchCandidate(
       state.stopReason = "MODEL_FAILURE";
       return compileResult(state, "REJECTED", "REJECT", "MODEL_FAILURE");
     }
+
+    decision = enforceControllerPolicy(state, decision);
 
     const action = decision.action;
     state.lastAction = action;
