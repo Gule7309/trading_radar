@@ -13,6 +13,7 @@ import type {
   ToolObservation,
 } from "./tool-router.js";
 import type { ResearchAction } from "../domain/research.js";
+import { fetchExternalSource } from "./web/fetch-source.js";
 
 export type MonthlyRevenueFetcher = (
   market: TaiwanMarket,
@@ -28,6 +29,10 @@ export type MaterialDisclosureFetcher = (
   market: TaiwanMarket,
   ticker: string,
 ) => ReturnType<typeof fetchLatestMaterialDisclosures>;
+
+export type SourceFetcher = (
+  url: string,
+) => Promise<SourceDocument>;
 
 function buildMonthlyRevenueFact(
   record: MonthlyRevenueRecord,
@@ -102,6 +107,7 @@ export class DefaultToolRouter implements ResearchToolRouter {
       fetchLatestMonthlyRevenue,
     private readonly materialDisclosureFetcher: MaterialDisclosureFetcher =
       fetchLatestMaterialDisclosures,
+    private readonly sourceFetcher: SourceFetcher = fetchExternalSource,
   ) {}
 
   async execute(
@@ -178,6 +184,28 @@ export class DefaultToolRouter implements ResearchToolRouter {
                 : "Unknown material disclosure error.",
           };
         }
+      }
+    }
+
+    if (action.type === "FETCH_SOURCE") {
+      const source = context.candidate
+        ? undefined
+        : undefined;
+
+      try {
+        const knownSource = action.sourceId;
+        return {
+          outcome: "EMPTY",
+          summary:
+            `FETCH_SOURCE requires the caller to provide a URL-backed source. ` +
+            `Source id ${knownSource} is not resolvable from ToolExecutionContext yet.`,
+        };
+      } catch (error) {
+        return {
+          outcome: "ERROR",
+          summary:
+            error instanceof Error ? error.message : "Unknown source fetch error.",
+        };
       }
     }
 
