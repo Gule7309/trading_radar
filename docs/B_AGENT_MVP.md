@@ -69,12 +69,20 @@ Implemented since the initial scaffold:
 - HTTP timeout / retry policy
 - CI typecheck + tests
 
+Current live stack:
+
+- Gemini structured-output adapter for the hackathon development phase
+- Gemini Google Search grounding as discovery-only web search
+- TWSE / TPEx official adapters
+- guarded direct-page fetch before web evidence can support publication
+- SQLite thesis persistence / recheck
+- E01–E10 eval scenario catalog and repeat-run harness
+
 Still pending:
 
-- choose and wire a concrete LLM provider
-- choose and wire a concrete dynamic news/search provider
-- SQLite thesis persistence / recheck
-- full eval case suite and repeat-run reliability report
+- run the full E01–E10 live evaluation suite and record reliability / latency / cost
+- tune research budgets and controller policy from live eval results
+- add the production OpenAI adapter when the team is ready to switch providers
 
 ## Design sources
 
@@ -122,9 +130,15 @@ Use deterministic code for:
 6. Add retry/fallback and conflict handling.
 
 
+## Provider strategy
+
+The core architecture is intentionally provider-neutral.
+
+`LlmProvider` isolates controller, claim extraction, verification, skeptic, and thesis compilation from any specific model vendor. `SearchProvider` similarly isolates dynamic discovery. The current hackathon development runtime uses Gemini because credentials are available now; the intended later migration to OpenAI should be implemented as another adapter rather than by changing the harness, domain models, evidence ledger, or publication policy.
+
 ## Gemini implementation
 
-The live MVP now uses the Google Gen AI SDK through a provider-neutral adapter.
+The current development runtime uses the Google Gen AI SDK through that provider-neutral adapter.
 
 Default model:
 
