@@ -23,6 +23,23 @@ export function enforceControllerPolicy(
 ): ControllerDecision {
   const action = decision.action;
   const remainingSteps = state.budget.maxSteps - state.budget.stepsUsed;
+  const hasPrimarySource = state.sources.some(
+    (source) => source.sourceTier === 1,
+  );
+  const hasFetchedSecondarySource = state.sources.some(
+    (source) => source.sourceTier === 2,
+  );
+
+  if (
+    state.claims.length === 0 &&
+    hasPrimarySource &&
+    hasFetchedSecondarySource &&
+    action.type !== "VERIFY"
+  ) {
+    return forceVerify(
+      "Primary evidence and a directly fetched secondary source are available; verify before spending budget on more research.",
+    );
+  }
 
   if (
     state.claims.length === 0 &&
