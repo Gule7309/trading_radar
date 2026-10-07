@@ -120,3 +120,31 @@ Use deterministic code for:
 4. Add deterministic numeric verification.
 5. Add textual verifier.
 6. Add retry/fallback and conflict handling.
+
+
+## Gemini implementation
+
+The live MVP now uses the Google Gen AI SDK through a provider-neutral adapter.
+
+Default model:
+
+- `gemini-3.8-flash` for structured controller / extraction / verification / skeptic / thesis tasks.
+- `gemini-3.8-flash` with Google Search grounding for dynamic web research.
+
+The model names remain environment-configurable through `GEMINI_MODEL` and
+`GEMINI_SEARCH_MODEL`.
+
+Structured model calls use JSON Schema converted from the existing Zod schemas.
+Dynamic search keeps grounded citation URLs and cited text as normalized
+`SearchResult` objects. The rest of the harness remains independent of Gemini,
+so another provider can be substituted later without changing the domain layer.
+
+Local live run:
+
+```bash
+export GEMINI_API_KEY="..."
+npm install
+npm run demo:gemini -- 2330 台積電 TWSE 半導體業
+```
+
+Do not commit API keys or paste them into research artifacts.
