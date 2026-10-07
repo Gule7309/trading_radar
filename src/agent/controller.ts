@@ -32,28 +32,6 @@ export class MockResearchController implements ResearchController {
       };
     }
 
-    const hasMaterialDisclosureSearch = state.researchTrace.some(
-      (step) =>
-        step.action === "SEARCH_OFFICIAL" &&
-        step.actionDetail === "MATERIAL_DISCLOSURES",
-    );
-
-    if (!hasMaterialDisclosureSearch) {
-      return {
-        reasonCode: "CHECK_RECENT_COMPANY_EVENTS",
-        summary: "Check first-party disclosures for thesis-changing events.",
-        action: {
-          type: "SEARCH_OFFICIAL",
-          dataset: "MATERIAL_DISCLOSURES",
-          purpose:
-            "Check recent first-party company disclosures for events that may alter the thesis.",
-          query: `${state.candidate.ticker} latest material disclosures`,
-          evidenceNeed:
-            "Recent company-specific events, guidance, one-off factors, or risk signals.",
-        },
-      };
-    }
-
     if (!state.sources.some((source) => source.sourceType === "NEWS")) {
       return {
         reasonCode: "NEED_DOWNSIDE_CONTEXT",
