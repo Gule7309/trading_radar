@@ -4,6 +4,7 @@ import type {
   SearchQuery,
   SearchResult,
 } from "./provider.js";
+import { prioritizeDiscoveryResults } from "./source-policy.js";
 
 export interface GeminiGoogleSearchProviderOptions {
   apiKey: string;
@@ -139,7 +140,10 @@ export class GeminiGoogleSearchProvider implements SearchProvider {
       | GroundedCandidate
       | undefined;
 
-    return extractGroundedSearchResults(text, candidate, maxResults);
+    return prioritizeDiscoveryResults(
+      extractGroundedSearchResults(text, candidate, maxResults * 2),
+      maxResults,
+    );
   }
 }
 
