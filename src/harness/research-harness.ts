@@ -15,7 +15,11 @@ import type { ResearchToolRouter } from "../tools/tool-router.js";
 import type { VerificationPipeline } from "../evidence/verification-pipeline.js";
 import type { Skeptic } from "../agent/skeptic.js";
 import type { ThesisCompiler } from "../agent/thesis-compiler.js";
-import { DEFAULT_RESEARCH_BUDGET, isBudgetExceeded } from "./budgets.js";
+import {
+  DEFAULT_RESEARCH_BUDGET,
+  actionWouldExceedBudget,
+  isBudgetExceeded,
+} from "./budgets.js";
 import { evaluatePublicationGate } from "./publication-gate.js";
 import { enforceControllerPolicy } from "./controller-policy.js";
 
@@ -288,6 +292,18 @@ export async function researchCandidate(
     decision = enforceControllerPolicy(state, decision);
 
     const action = decision.action;
+
+    if (actionWouldExceedBudget(state, action)) {
+      state.phase = "REJECTED";
+      state.stopReason = "BUDGET_EXHAUSTED";
+      return compileResult(
+        state,
+        "REJECTED",
+        "REJECT",
+        "BUDGET_EXHAUSTED",
+      );
+    }
+
     state.lastAction = action;
     incrementBudget(state, action);
 
