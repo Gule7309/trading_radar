@@ -25,7 +25,7 @@ export class MockResearchController implements ResearchController {
     const hasMaterialDisclosureSearch = state.researchTrace.some(
       (step) =>
         step.action === "SEARCH_OFFICIAL" &&
-        step.reasonCode === "MATERIAL_DISCLOSURE_SEARCH",
+        step.actionDetail === "MATERIAL_DISCLOSURES",
     );
 
     if (!hasMaterialDisclosureSearch) {
