@@ -188,17 +188,38 @@ export class DefaultToolRouter implements ResearchToolRouter {
     }
 
     if (action.type === "FETCH_SOURCE") {
-      const source = context.candidate
-        ? undefined
-        : undefined;
+      const knownSource = context.sources?.find(
+        (source) => source.sourceId === action.sourceId,
+      );
 
-      try {
-        const knownSource = action.sourceId;
+      if (!knownSource) {
         return {
           outcome: "EMPTY",
-          summary:
-            `FETCH_SOURCE requires the caller to provide a URL-backed source. ` +
-            `Source id ${knownSource} is not resolvable from ToolExecutionContext yet.`,
+          summary: `Source id ${action.sourceId} is not present in research state.`,
+        };
+      }
+
+      try {
+        const fetched = await this.sourceFetcher(knownSource.url);
+
+        return {
+          outcome: "SUCCESS",
+          summary: `Fetched full source text for ${action.sourceId}.`,
+          sources: [
+            {
+              ...fetched,
+              sourceId: `${knownSource.sourceId}-full`,
+              sourceTier: knownSource.sourceTier,
+              sourceType: knownSource.sourceType,
+              publisher: knownSource.publisher || fetched.publisher,
+              publishedAt: knownSource.publishedAt ?? fetched.publishedAt,
+              ticker: context.candidate.ticker,
+              metadata: {
+                ...(fetched.metadata ?? {}),
+                parentSourceId: knownSource.sourceId,
+              },
+            },
+          ],
         };
       } catch (error) {
         return {
