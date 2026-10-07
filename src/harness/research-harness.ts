@@ -42,6 +42,7 @@ function initializeResearchState(candidate: CandidatePacket): ResearchState {
       startedAt: new Date().toISOString(),
     },
     researchTrace: [],
+    evidenceDirty: false,
     diagnostics: [],
     invalidationConditions: [],
   };
@@ -300,7 +301,11 @@ export async function researchCandidate(
         sources: state.sources,
       });
 
-      state.sources.push(...(observation.sources ?? []));
+      const newSources = observation.sources ?? [];
+      state.sources.push(...newSources);
+      if (newSources.length > 0) {
+        state.evidenceDirty = true;
+      }
       state.knownFacts.push(...(observation.knownFacts ?? []));
       state.risks.push(...(observation.risks ?? []));
 
@@ -348,6 +353,7 @@ export async function researchCandidate(
         return modelFailureResult(state, decision, "VERIFICATION", error);
       }
 
+      state.evidenceDirty = false;
       addTrace(state, decision, "Verification completed.");
       state.phase = "VERIFY";
       continue;
@@ -445,7 +451,8 @@ export async function researchCandidate(
       if (
         (gate.reason === "CORE_CLAIM_DISCOVERY_ONLY" ||
           gate.reason === "FINANCIAL_CORE_WITHOUT_PRIMARY" ||
-          gate.reason === "RISK_DISCOVERY_ONLY") &&
+          gate.reason === "RISK_DISCOVERY_ONLY" ||
+          gate.reason === "NO_RISK_IDENTIFIED") &&
         !isBudgetExceeded(state)
       ) {
         state.openQuestions.push({
@@ -454,7 +461,9 @@ export async function researchCandidate(
           evidenceNeed:
             gate.reason === "FINANCIAL_CORE_WITHOUT_PRIMARY"
               ? "Find a Tier-1 official source for the financial core claim."
-              : "Fetch the underlying web source so discovery-only evidence becomes directly inspectable.",
+              : gate.reason === "NO_RISK_IDENTIFIED"
+                ? "Find a current company-specific downside risk source, fetch it, and verify again."
+                : "Fetch the underlying web source so discovery-only evidence becomes directly inspectable.",
           status: "OPEN",
         });
         state.phase = "RESEARCH";
