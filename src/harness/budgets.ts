@@ -2,9 +2,9 @@ import type { ResearchBudget, ResearchState } from "../domain/research.js";
 
 export const DEFAULT_RESEARCH_BUDGET: Omit<ResearchBudget, "startedAt"> = {
   stepsUsed: 0,
-  maxSteps: 8,
+  maxSteps: 12,
   searchesUsed: 0,
-  maxSearches: 4,
+  maxSearches: 5,
   skepticRounds: 0,
   maxSkepticRounds: 1,
 };
