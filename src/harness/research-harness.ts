@@ -43,6 +43,12 @@ function addTrace(
   state.researchTrace.push({
     step: state.budget.stepsUsed,
     action: action.type,
+    actionDetail:
+      action.type === "SEARCH_OFFICIAL"
+        ? action.dataset
+        : action.type === "SEARCH_NEWS"
+          ? action.query
+          : undefined,
     reasonCode,
     tool,
     outcome,
