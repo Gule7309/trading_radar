@@ -18,6 +18,7 @@ export class LlmRiskExtractor implements RiskExtractor {
         "Do not invent generic investment risks.",
         "Each risk must cite one or more sourceIds that contain evidence for it.",
         "Prefer company-specific and current risks.",
+        "Discovery-only Tier-3 search snippets are intentionally excluded from this task.",
         "Do not provide chain-of-thought.",
       ].join("\n"),
       input: {
@@ -25,13 +26,15 @@ export class LlmRiskExtractor implements RiskExtractor {
           ticker: state.candidate.ticker,
           companyName: state.candidate.companyName,
         },
-        sources: state.sources.map((source) => ({
+        sources: state.sources
+          .filter((source) => source.sourceTier <= 2)
+          .map((source) => ({
           sourceId: source.sourceId,
           sourceTier: source.sourceTier,
           title: source.title,
           publishedAt: source.publishedAt,
-          snippet: source.snippet,
-        })),
+            snippet: source.snippet,
+          })),
       },
       schema: RiskExtractionOutputSchema,
     });
