@@ -84,7 +84,7 @@ function partitionClaims(claims: ThesisClaimSnapshot[]) {
 
 export function createInitialThesis(
   result: ResearchResult,
-  thesisId = randomUUID(),
+  thesisId: string = randomUUID(),
 ): ThesisVersion {
   if (result.status !== "PUBLISHABLE" || !result.thesis) {
     throw new Error("Only a publishable research result can create a thesis.");
