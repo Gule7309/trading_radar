@@ -36,6 +36,34 @@ function extractTitle(html: string): string | undefined {
   return match ? htmlToPlainText(match[1] ?? "") : undefined;
 }
 
+function normalizeDate(value: string | undefined): string | undefined {
+  if (!value) return undefined;
+
+  const parsed = new Date(value.trim());
+  if (Number.isNaN(parsed.getTime())) return undefined;
+
+  return parsed.toISOString();
+}
+
+export function extractPublishedAt(html: string): string | undefined {
+  const patterns = [
+    /<meta[^>]+property=["']article:published_time["'][^>]+content=["']([^"']+)["'][^>]*>/i,
+    /<meta[^>]+content=["']([^"']+)["'][^>]+property=["']article:published_time["'][^>]*>/i,
+    /<meta[^>]+name=["'](?:date|publish-date|publication_date|datePublished)["'][^>]+content=["']([^"']+)["'][^>]*>/i,
+    /<meta[^>]+content=["']([^"']+)["'][^>]+name=["'](?:date|publish-date|publication_date|datePublished)["'][^>]*>/i,
+    /<time[^>]+datetime=["']([^"']+)["'][^>]*>/i,
+    /"datePublished"\s*:\s*"([^"]+)"/i,
+  ];
+
+  for (const pattern of patterns) {
+    const match = html.match(pattern);
+    const normalized = normalizeDate(match?.[1]);
+    if (normalized) return normalized;
+  }
+
+  return undefined;
+}
+
 export async function fetchExternalSource(
   inputUrl: string,
   options: FetchSourceOptions = {},
@@ -105,6 +133,9 @@ export async function fetchExternalSource(
       publisher: hostname,
       sourceType: "OTHER",
       sourceTier: 3,
+      publishedAt: contentType.includes("html")
+        ? extractPublishedAt(limited)
+        : undefined,
       retrievedAt: new Date().toISOString(),
       snippet: text.slice(0, 4_000),
       contentHash: hash,
