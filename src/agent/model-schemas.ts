@@ -90,7 +90,6 @@ export const ResearchActionSchema = z.discriminatedUnion("type", [
     reason: z.enum([
       "INSUFFICIENT_EVIDENCE",
       "UNRESOLVED_CONFLICT",
-      "BUDGET_EXHAUSTED",
       "SOURCE_FAILURE",
     ]),
   }),
