@@ -269,6 +269,7 @@ export async function researchCandidate(
     ) {
       const observation = await toolRouter.execute(action, {
         candidate: state.candidate,
+        sources: state.sources,
       });
 
       state.sources.push(...(observation.sources ?? []));
