@@ -179,7 +179,7 @@ export interface ResearchState {
   conflicts: ConflictItem[];
   budget: ResearchBudget;
   researchTrace: ResearchTraceStep[];
-  diagnostics: ResearchDiagnostic[];
+  diagnostics?: ResearchDiagnostic[];
   lastAction?: ResearchAction;
   stopReason?: StopReason;
   invalidationConditions: string[];
@@ -220,7 +220,7 @@ export interface ResearchResult {
     unresolvedConflicts: number;
   };
   researchTrace: ResearchTraceStep[];
-  diagnostics: ResearchDiagnostic[];
+  diagnostics?: ResearchDiagnostic[];
   stopReason: StopReason;
   startedAt: string;
   completedAt: string;
