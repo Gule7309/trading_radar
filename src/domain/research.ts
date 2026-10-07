@@ -39,6 +39,8 @@ export interface OpenQuestion {
   status: "OPEN" | "RESOLVED";
 }
 
+export type SourceMetadataValue = string | number | boolean | null;
+
 export interface SourceDocument {
   sourceId: string;
   url: string;
@@ -47,10 +49,12 @@ export interface SourceDocument {
   sourceType: "TWSE" | "TPEX" | "MOPS" | "COMPANY_IR" | "NEWS" | "OTHER";
   sourceTier: 1 | 2 | 3;
   publishedAt?: string;
+  dataPeriod?: string;
   retrievedAt: string;
   ticker?: string;
   snippet: string;
   contentHash: string;
+  metadata?: Record<string, SourceMetadataValue>;
   untrustedContent: true;
 }
 
@@ -97,6 +101,7 @@ export interface ConflictItem {
 export type ResearchAction =
   | {
       type: "SEARCH_OFFICIAL";
+      dataset: "MONTHLY_REVENUE";
       purpose: string;
       query: string;
       evidenceNeed: string;
@@ -196,6 +201,7 @@ export interface ResearchResult {
     url: string;
     publisher: string;
     publishedAt?: string;
+    dataPeriod?: string;
     sourceTier: number;
   }>;
   verificationSummary: {
