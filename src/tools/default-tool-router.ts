@@ -5,6 +5,7 @@ import {
   fetchLatestMonthlyRevenue,
   type OfficialDataNotFoundError,
 } from "./official/monthly-revenue-client.js";
+import { fetchLatestMaterialDisclosures } from "./official/material-disclosure-client.js";
 import type { MonthlyRevenueRecord, TaiwanMarket } from "./official/monthly-revenue.js";
 import type {
   ResearchToolRouter,
@@ -22,6 +23,11 @@ export type MonthlyRevenueFetcher = (
   attempts: number;
   durationMs: number;
 }>;
+
+export type MaterialDisclosureFetcher = (
+  market: TaiwanMarket,
+  ticker: string,
+) => ReturnType<typeof fetchLatestMaterialDisclosures>;
 
 function buildMonthlyRevenueFact(
   record: MonthlyRevenueRecord,
@@ -94,6 +100,8 @@ export class DefaultToolRouter implements ResearchToolRouter {
     private readonly searchProvider: SearchProvider,
     private readonly monthlyRevenueFetcher: MonthlyRevenueFetcher =
       fetchLatestMonthlyRevenue,
+    private readonly materialDisclosureFetcher: MaterialDisclosureFetcher =
+      fetchLatestMaterialDisclosures,
   ) {}
 
   async execute(
@@ -101,41 +109,75 @@ export class DefaultToolRouter implements ResearchToolRouter {
     context: ToolExecutionContext,
   ): Promise<ToolObservation> {
     if (action.type === "SEARCH_OFFICIAL") {
-      if (action.dataset !== "MONTHLY_REVENUE") {
-        return {
-          outcome: "EMPTY",
-          summary: `Unsupported official dataset: ${String(action.dataset)}`,
-        };
+      if (action.dataset === "MONTHLY_REVENUE") {
+        try {
+          const result = await this.monthlyRevenueFetcher(
+            context.candidate.market,
+            context.candidate.ticker,
+          );
+
+          return {
+            outcome: "SUCCESS",
+            summary:
+              `Fetched official monthly revenue for ${context.candidate.ticker} ` +
+              `in ${result.attempts} attempt(s), ${result.durationMs} ms.`,
+            sources: [result.source],
+            knownFacts: [
+              buildMonthlyRevenueFact(result.record, result.source.sourceId),
+            ],
+          };
+        } catch (error) {
+          const maybeNotFound = error as Partial<OfficialDataNotFoundError>;
+
+          return {
+            outcome: "ERROR",
+            summary:
+              maybeNotFound.name === "OfficialDataNotFoundError"
+                ? `Official monthly revenue row not found for ${context.candidate.ticker}.`
+                : error instanceof Error
+                  ? error.message
+                  : "Unknown official data error.",
+          };
+        }
       }
 
-      try {
-        const result = await this.monthlyRevenueFetcher(
-          context.candidate.market,
-          context.candidate.ticker,
-        );
+      if (action.dataset === "MATERIAL_DISCLOSURES") {
+        try {
+          const result = await this.materialDisclosureFetcher(
+            context.candidate.market,
+            context.candidate.ticker,
+          );
 
-        return {
-          outcome: "SUCCESS",
-          summary:
-            `Fetched official monthly revenue for ${context.candidate.ticker} ` +
-            `in ${result.attempts} attempt(s), ${result.durationMs} ms.`,
-          sources: [result.source],
-          knownFacts: [
-            buildMonthlyRevenueFact(result.record, result.source.sourceId),
-          ],
-        };
-      } catch (error) {
-        const maybeNotFound = error as Partial<OfficialDataNotFoundError>;
-
-        return {
-          outcome: "ERROR",
-          summary:
-            maybeNotFound.name === "OfficialDataNotFoundError"
-              ? `Official monthly revenue row not found for ${context.candidate.ticker}.`
-              : error instanceof Error
+          return {
+            outcome: "SUCCESS",
+            summary:
+              `Fetched ${result.records.length} material disclosure(s) for ` +
+              `${context.candidate.ticker} in ${result.attempts} attempt(s), ` +
+              `${result.durationMs} ms.`,
+            sources: result.sources,
+            knownFacts: result.records.map((record, index) => ({
+              factId: `fact-disclosure-${record.ticker}-${index + 1}`,
+              text: [
+                record.announcementDate,
+                record.subject,
+                record.clause,
+              ]
+                .filter(Boolean)
+                .join(" | "),
+              sourceIds: result.sources[index]
+                ? [result.sources[index]!.sourceId]
+                : [],
+            })),
+          };
+        } catch (error) {
+          return {
+            outcome: "ERROR",
+            summary:
+              error instanceof Error
                 ? error.message
-                : "Unknown official data error.",
-        };
+                : "Unknown material disclosure error.",
+          };
+        }
       }
     }
 
