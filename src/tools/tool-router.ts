@@ -8,6 +8,7 @@ import type {
 
 export interface ToolExecutionContext {
   candidate: CandidatePacket;
+  sources?: SourceDocument[];
 }
 
 export interface ToolObservation {
