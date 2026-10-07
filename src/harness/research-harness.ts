@@ -281,9 +281,30 @@ export async function researchCandidate(
       addTrace(state, decision, observation.summary, action.type);
 
       if (observation.outcome === "ERROR") {
-        state.phase = "REJECTED";
-        state.stopReason = "SOURCE_FAILURE";
-        return compileResult(state, "REJECTED", "REJECT", "SOURCE_FAILURE");
+        state.openQuestions.push({
+          questionId: `tool-failure-${state.budget.stepsUsed}`,
+          text:
+            `Tool action ${action.type} failed: ${observation.summary}`,
+          evidenceNeed:
+            observation.retryable === false
+              ? "Use a different source or research path."
+              : "Retry only if justified; otherwise use a different source or research path.",
+          status: "OPEN",
+        });
+
+        if (isBudgetExceeded(state)) {
+          state.phase = "REJECTED";
+          state.stopReason = "SOURCE_FAILURE";
+          return compileResult(
+            state,
+            "REJECTED",
+            "REJECT",
+            "SOURCE_FAILURE",
+          );
+        }
+
+        state.phase = "RESEARCH";
+        continue;
       }
 
       state.phase = "RESEARCH";
