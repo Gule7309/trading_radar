@@ -122,7 +122,7 @@ describe("DefaultToolRouter", () => {
 
     expect(observation.outcome).toBe("SUCCESS");
     expect(observation.sources?.[0]?.sourceType).toBe("NEWS");
-    expect(observation.sources?.[0]?.sourceTier).toBe(2);
+    expect(observation.sources?.[0]?.sourceTier).toBe(3);
   });
 
   it("fetches a known source through the guarded fetcher", async () => {
