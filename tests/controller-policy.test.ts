@@ -76,6 +76,29 @@ describe("enforceControllerPolicy", () => {
     expect(decision.action.type).toBe("VERIFY");
   });
 
+  it("forces re-verification after new evidence arrives", () => {
+    const current = state();
+    current.claims = [
+      {
+        claimId: "core-1",
+        text: "Revenue grew.",
+        category: "FINANCIAL",
+        importance: "CORE",
+        status: "SUPPORTED",
+      },
+    ];
+    current.evidenceDirty = true;
+
+    const decision = enforceControllerPolicy(current, {
+      reasonCode: "MODEL_FINALIZE",
+      summary: "Finalize.",
+      action: { type: "FINALIZE" },
+    });
+
+    expect(decision.action.type).toBe("VERIFY");
+    expect(decision.reasonCode).toBe("POLICY_FORCE_VERIFY");
+  });
+
   it("skips an unnecessary skeptic after supported primary evidence and grounded risk", () => {
     const current = state();
     current.claims = [
