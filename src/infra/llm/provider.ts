@@ -1,6 +1,7 @@
 export type LlmTask =
   | "CONTROLLER"
   | "CLAIM_EXTRACTION"
+  | "RISK_EXTRACTION"
   | "VERIFIER"
   | "SKEPTIC"
   | "THESIS";
