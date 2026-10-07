@@ -54,6 +54,13 @@ Official-data smoke test:
 npm run demo:official -- 2330 TWSE
 ```
 
+Gemini API smoke test:
+
+```bash
+set GEMINI_API_KEY=YOUR_KEY
+npm run demo:gemini:smoke
+```
+
 Live Gemini research path:
 
 ```bash
