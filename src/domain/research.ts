@@ -135,7 +135,6 @@ export type ResearchAction =
       reason:
         | "INSUFFICIENT_EVIDENCE"
         | "UNRESOLVED_CONFLICT"
-        | "BUDGET_EXHAUSTED"
         | "SOURCE_FAILURE";
     };
 
