@@ -210,7 +210,7 @@ function compileResult(
     })),
     verificationSummary: computeVerificationSummary(state),
     researchTrace: state.researchTrace,
-    diagnostics: state.diagnostics,
+    diagnostics: state.diagnostics ?? [],
     stopReason,
     startedAt: state.budget.startedAt,
     completedAt: new Date().toISOString(),
@@ -228,7 +228,7 @@ function addDiagnostic(
   stage: "CONTROLLER" | "VERIFICATION" | "SKEPTIC" | "THESIS",
   error: unknown,
 ): void {
-  state.diagnostics.push({
+  (state.diagnostics ??= []).push({
     stage,
     message: describeError(error),
     createdAt: new Date().toISOString(),
@@ -385,7 +385,7 @@ export async function researchCandidate(
         state.phase = "SKEPTIC";
         continue;
       } catch (error) {
-        return modelFailureResult(state, decision, "VERIFICATION", error);
+        return modelFailureResult(state, decision, "SKEPTIC", error);
       }
     }
 
