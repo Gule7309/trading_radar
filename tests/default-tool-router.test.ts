@@ -1,7 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { DefaultToolRouter } from "../src/tools/default-tool-router.js";
 import type { SearchProvider } from "../src/infra/search/provider.js";
-import type { MonthlyRevenueFetcher } from "../src/tools/default-tool-router.js";
+import type {
+  MaterialDisclosureFetcher,
+  MonthlyRevenueFetcher,
+  SourceFetcher,
+} from "../src/tools/default-tool-router.js";
 
 const searchProvider: SearchProvider = {
   name: "fixture",
@@ -48,6 +52,26 @@ const monthlyRevenueFetcher: MonthlyRevenueFetcher = async (market, ticker) => (
   },
   attempts: 1,
   durationMs: 10,
+});
+
+const materialDisclosureFetcher: MaterialDisclosureFetcher = async () => ({
+  records: [],
+  sources: [],
+  attempts: 1,
+  durationMs: 5,
+});
+
+const sourceFetcher: SourceFetcher = async (url) => ({
+  sourceId: "fetched",
+  url,
+  title: "Fetched article",
+  publisher: "example.com",
+  sourceType: "OTHER",
+  sourceTier: 3,
+  retrievedAt: "2026-10-07T00:00:00Z",
+  snippet: "Full source text.",
+  contentHash: "fetched",
+  untrustedContent: true,
 });
 
 const context = {
@@ -97,6 +121,47 @@ describe("DefaultToolRouter", () => {
     );
 
     expect(observation.outcome).toBe("SUCCESS");
+    expect(observation.sources?.[0]?.sourceType).toBe("NEWS");
+    expect(observation.sources?.[0]?.sourceTier).toBe(2);
+  });
+
+  it("fetches a known source through the guarded fetcher", async () => {
+    const router = new DefaultToolRouter(
+      searchProvider,
+      monthlyRevenueFetcher,
+      materialDisclosureFetcher,
+      sourceFetcher,
+    );
+
+    const observation = await router.execute(
+      {
+        type: "FETCH_SOURCE",
+        sourceId: "news-source",
+        purpose: "retrieve full text",
+      },
+      {
+        ...context,
+        sources: [
+          {
+            sourceId: "news-source",
+            url: "https://example.com/full",
+            title: "Search result",
+            publisher: "Example Finance",
+            sourceType: "NEWS",
+            sourceTier: 2,
+            publishedAt: "2026-10-06",
+            retrievedAt: "2026-10-07T00:00:00Z",
+            ticker: "2330",
+            snippet: "Search snippet",
+            contentHash: "snippet",
+            untrustedContent: true,
+          },
+        ],
+      },
+    );
+
+    expect(observation.outcome).toBe("SUCCESS");
+    expect(observation.sources?.[0]?.sourceId).toBe("news-source-full");
     expect(observation.sources?.[0]?.sourceType).toBe("NEWS");
     expect(observation.sources?.[0]?.sourceTier).toBe(2);
   });
