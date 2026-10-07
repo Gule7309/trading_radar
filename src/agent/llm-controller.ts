@@ -39,6 +39,7 @@ function projectState(state: ResearchState) {
       skepticRounds:
         state.budget.maxSkepticRounds - state.budget.skepticRounds,
     },
+    evidenceDirty: state.evidenceDirty ?? false,
     recentTrace: state.researchTrace.slice(-4),
   };
 }
@@ -59,6 +60,7 @@ export class LlmResearchController implements ResearchController {
         "Use SEARCH_NEWS for current context or downside evidence after checking relevant official data.",
         "Google Search result snippets are discovery-only (sourceTier=3). Before using a web result as evidence for a core claim or published risk, FETCH_SOURCE to retrieve the underlying page.",
         "Use VERIFY only after core evidence sources are either official Tier-1 sources or fetched Tier-2 pages.",
+        "If evidenceDirty is true, VERIFY before RUN_SKEPTIC or FINALIZE.",
         "Use FINALIZE only when claims have been verified and at least one grounded risk exists.",
         "Use REJECT when a core conclusion cannot be verified within the remaining budget.",
         "Do not expose chain-of-thought. reasonCode and summary must be short operational labels.",
