@@ -101,7 +101,7 @@ export interface ConflictItem {
 export type ResearchAction =
   | {
       type: "SEARCH_OFFICIAL";
-      dataset: "MONTHLY_REVENUE";
+      dataset: "MONTHLY_REVENUE" | "MATERIAL_DISCLOSURES";
       purpose: string;
       query: string;
       evidenceNeed: string;
