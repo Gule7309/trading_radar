@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 import { toGeminiJsonSchema } from "../src/infra/llm/gemini.js";
+import { ControllerDecisionSchema } from "../src/agent/model-schemas.js";
 import {
   extractGroundedSearchResults,
 } from "../src/infra/search/gemini-google-search.js";
@@ -16,6 +17,17 @@ describe("Gemini adapters", () => {
 
     expect(schema.type).toBe("object");
     expect(schema.properties).toBeDefined();
+  });
+
+  it("strips unsupported JSON Schema keywords and converts const to enum", () => {
+    const schema = toGeminiJsonSchema(ControllerDecisionSchema);
+    const serialized = JSON.stringify(schema);
+
+    expect(serialized).not.toContain('"minLength"');
+    expect(serialized).not.toContain('"maxLength"');
+    expect(serialized).not.toContain('"const"');
+    expect(serialized).not.toContain('"$schema"');
+    expect(serialized).toContain('"enum":["SEARCH_OFFICIAL"]');
   });
 
   it("extracts deduplicated cited web sources from grounding metadata", () => {
