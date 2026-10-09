@@ -221,6 +221,14 @@ export interface ResearchResult {
   };
   researchTrace: ResearchTraceStep[];
   diagnostics?: ResearchDiagnostic[];
+  metrics?: {
+    llmCalls: number;
+    inputTokens: number;
+    outputTokens: number;
+    llmLatencyMs: number;
+    estimatedCostUsd?: number;
+    totalLatencyMs: number;
+  };
   stopReason: StopReason;
   startedAt: string;
   completedAt: string;
