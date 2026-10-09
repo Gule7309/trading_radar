@@ -22,16 +22,40 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      # Node 專案尚未建立；有 package.json 後才執行，避免空 repo 的 CI 永遠失敗。
       - name: Setup Node
+        if: hashFiles('package.json') != ''
         uses: actions/setup-node@v4
         with:
           node-version: 22
 
       - name: Install dependencies
+        if: hashFiles('package.json') != ''
         run: npm install
 
       - name: Typecheck
+        if: hashFiles('package.json') != ''
         run: npm run typecheck
 
       - name: Test
+        if: hashFiles('package.json') != ''
         run: npm test
+
+  taiwan-data:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install package
+        run: python -m pip install -e "packages/taiwan_data[test]"
+
+      - name: Test
+        run: python -m pytest packages/taiwan_data -q
