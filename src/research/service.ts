@@ -11,12 +11,23 @@ export class ResearchService {
   ) {}
 
   async run(candidate: CandidatePacket): Promise<ResearchResult> {
+    const startedAtMs = Date.now();
     const result = await researchCandidate(
       candidate,
       this.runtime.controller,
       this.runtime.toolRouter,
       this.runtime.services,
     );
+
+    const telemetry = this.runtime.telemetry.snapshot();
+    result.metrics = {
+      llmCalls: telemetry.calls,
+      inputTokens: telemetry.inputTokens,
+      outputTokens: telemetry.outputTokens,
+      llmLatencyMs: telemetry.latencyMs,
+      estimatedCostUsd: telemetry.estimatedCostUsd,
+      totalLatencyMs: Date.now() - startedAtMs,
+    };
 
     await this.store.save({
       runId: result.runId,
