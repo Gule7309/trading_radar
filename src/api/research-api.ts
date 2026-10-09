@@ -1,7 +1,18 @@
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { URL } from "node:url";
 import { CandidatePacketSchema } from "../domain/candidate.js";
-import type { ResearchService } from "../research/service.js";
+import type { CandidatePacket } from "../domain/candidate.js";
+import type { ResearchResult } from "../domain/research.js";
+import type { StoredResearchRun } from "../research/store.js";
+
+export interface ResearchApiService {
+  run(candidate: CandidatePacket): Promise<ResearchResult>;
+  get(runId: string): Promise<StoredResearchRun | null>;
+  listByTicker(
+    ticker: string,
+    limit?: number,
+  ): Promise<StoredResearchRun[]>;
+}
 
 export interface ApiOptions {
   corsOrigin?: string;
@@ -51,7 +62,7 @@ async function readJsonBody(
 }
 
 export function createResearchApi(
-  service: ResearchService,
+  service: ResearchApiService,
   options: ApiOptions = {},
 ) {
   const corsOrigin = options.corsOrigin ?? "http://localhost:5173";
