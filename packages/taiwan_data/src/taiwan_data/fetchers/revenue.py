@@ -33,6 +33,7 @@ def fetch_month(year: int, month: int, session=None) -> list[dict]:
     rows: list[dict] = []
     errors: list[str] = []
     for market in ("sii", "otc"):
+        market_rows: list[dict] = []
         url = URL_TEMPLATE.format(market=market, roc=year - 1911, month=month)
         try:
             response = client.get(url, headers=USER_AGENT, timeout=30)
@@ -47,13 +48,16 @@ def fetch_month(year: int, month: int, session=None) -> list[dict]:
             if len(cells) < 7 or not is_stock_code(cells[0]):
                 continue
             revenue = clean_num(cells[2])
-            rows.append({
+            market_rows.append({
                 "stock_id": cells[0], "stock_name": cells[1], "year_month": year_month,
                 "revenue": int(revenue) if revenue is not None else None,
                 "mom_pct": clean_num(cells[5]), "yoy_pct": clean_num(cells[6]),
             })
-    if not rows and errors:
-        raise RuntimeError(f"月營收 {year_month} 兩市場皆抓取失敗：{' | '.join(errors)}")
+        if not market_rows:
+            errors.append(f"{market}: 回傳 0 筆可用資料")
+        rows.extend(market_rows)
+    if errors:
+        raise RuntimeError(f"月營收 {year_month} 市場資料不完整：{' | '.join(errors)}")
     return rows
 
 

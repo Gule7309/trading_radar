@@ -71,8 +71,14 @@ def main(argv: list[str] | None = None) -> None:
     else:
         result = _refresh(RefreshService(DataStore(args.db)), args)
     print(json.dumps(result, ensure_ascii=False, indent=2, default=str))
-    if isinstance(result, dict) and result.get("errors"):
+    if _result_failed(result):
         sys.exit(1)
+
+
+def _result_failed(result: object) -> bool:
+    if not isinstance(result, dict):
+        return False
+    return bool(result.get("errors")) or result.get("status") == "partial"
 
 
 def _refresh(service: RefreshService, args: argparse.Namespace) -> dict[str, object]:

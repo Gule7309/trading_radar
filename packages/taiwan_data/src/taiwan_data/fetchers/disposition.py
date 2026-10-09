@@ -19,7 +19,7 @@ _NOTICE_REASON_LIMIT = 200
 def fetch_twse_disposition(start: date, end: date, session=None) -> list[dict]:
     payload = get_json(URL_TWSE_PUNISH, params=_twse_range(start, end), session=session)
     if payload.get("stat") != "OK":
-        return []
+        raise RuntimeError(f"TWSE 處置股查詢失敗：{payload.get('stat')}")
     # 1 公布日期、2 代號、4 累計、5 處置條件、6 處置起迄、7 處置措施
     return _disposition_rows(payload.get("data"), "TWSE", period=6, reason=5, measure=7)
 
@@ -28,7 +28,7 @@ def fetch_tpex_disposition(start: date, end: date, session=None) -> list[dict]:
     payload = get_json(URL_TPEX_PUNISH, params=_tpex_range(start, end), session=session)
     tables = payload.get("tables") or []
     if str(payload.get("stat", "")).lower() != "ok" or not tables:
-        return []
+        raise RuntimeError(f"TPEX 處置股查詢失敗：{payload.get('stat')}")
     # 1 公布日期、2 代號、4 累計、5 處置起訖、6 處置原因、7 處置措施
     return _disposition_rows(tables[0].get("data"), "TPEX", period=5, reason=6, measure=7)
 
@@ -36,7 +36,7 @@ def fetch_tpex_disposition(start: date, end: date, session=None) -> list[dict]:
 def fetch_twse_notice(start: date, end: date, session=None) -> list[dict]:
     payload = get_json(URL_TWSE_NOTICE, params=_twse_range(start, end), session=session)
     if payload.get("stat") != "OK":
-        return []
+        raise RuntimeError(f"TWSE 注意股查詢失敗：{payload.get('stat')}")
     return _notice_rows(payload.get("data"), "TWSE")
 
 
@@ -44,7 +44,7 @@ def fetch_tpex_notice(start: date, end: date, session=None) -> list[dict]:
     payload = get_json(URL_TPEX_NOTICE, params=_tpex_range(start, end), session=session)
     tables = payload.get("tables") or []
     if str(payload.get("stat", "")).lower() != "ok" or not tables:
-        return []
+        raise RuntimeError(f"TPEX 注意股查詢失敗：{payload.get('stat')}")
     return _notice_rows(tables[0].get("data"), "TPEX")
 
 

@@ -3,6 +3,7 @@ from datetime import date
 import pytest
 
 from taiwan_data.db import DataStore
+from taiwan_data.cli import _result_failed
 from taiwan_data.fetchers import corporate, disposition, margin
 from taiwan_data.fetchers.common import parse_roc_date, parse_roc_period
 from taiwan_data.service import RefreshService, _month_chunks, _resume_date
@@ -126,6 +127,27 @@ def test_disposition_and_notice_parsers_for_both_markets():
     assert disposition.fetch_tpex_notice(*window, session=session)[0]["market"] == "TPEX"
 
 
+def test_failed_event_source_does_not_erase_existing_window(tmp_path):
+    store = DataStore(tmp_path / "t.sqlite")
+    store.ensure_schema()
+    store.upsert("notice_events", [{
+        "stock_id": "2330", "notice_date": "2026-10-07",
+        "reason": "existing", "market": "TWSE",
+    }], ("stock_id", "notice_date", "reason"))
+    session = Session({
+        disposition.URL_TWSE_PUNISH: {"stat": "查詢失敗"},
+    })
+
+    with pytest.raises(RuntimeError, match="TWSE 處置股查詢失敗"):
+        RefreshService(store, session=session).refresh_disposition(
+            until=date(2026, 10, 8), delay=0
+        )
+
+    assert _query(store, "SELECT stock_id, reason FROM notice_events") == [
+        ("2330", "existing")
+    ]
+
+
 def test_delisted_marks_inactive_but_keeps_reused_codes(tmp_path):
     store = DataStore(tmp_path / "t.sqlite")
     store.ensure_schema()
@@ -194,6 +216,31 @@ def test_refresh_all_isolates_failures(tmp_path, monkeypatch):
     statuses = {row["dataset"]: row["status"] for row in store.status()["dataset_status"]}
     assert statuses["delisted_stocks"] == "success"
     assert statuses["quarterly_financials"] == "failed"
+
+
+def test_refresh_all_and_cli_treat_partial_as_failure(tmp_path, monkeypatch):
+    service = RefreshService(DataStore(tmp_path / "t.sqlite"), session=Session({}))
+    monkeypatch.setattr(
+        service,
+        "refresh_market",
+        lambda **kwargs: {
+            "status": "partial",
+            "partial_days": ["2026-10-09: TPEX price unavailable"],
+        },
+    )
+    for name in (
+        "refresh_stocks_and_latest_prices", "refresh_revenue", "refresh_financials",
+        "refresh_margin", "refresh_dividends", "refresh_disposition", "refresh_delisted",
+        "refresh_industries",
+    ):
+        monkeypatch.setattr(service, name, lambda **kwargs: {"status": "success"})
+
+    result = service.refresh_all(delay=0)
+
+    assert "market" in result["errors"]
+    assert _result_failed(result)
+    assert _result_failed({"status": "partial"})
+    assert not _result_failed({"status": "success"})
 
 
 def test_resume_and_month_chunks():

@@ -38,10 +38,14 @@ def fetch_latest_financials(session=None) -> list[dict]:
         except Exception as exc:
             failures.append(f"{market}: {exc}")
             continue
-        for row in merge_financials(income, balance, market, fetched_at):
+        market_rows = merge_financials(income, balance, market, fetched_at)
+        if not market_rows:
+            failures.append(f"{market}: 官方財報回傳 0 筆可配對資料")
+            continue
+        for row in market_rows:
             rows[row["stock_id"]] = row
-    if not rows and failures:
-        raise RuntimeError("財報兩市場皆抓取失敗：" + " | ".join(failures))
+    if failures:
+        raise RuntimeError("財報市場資料不完整：" + " | ".join(failures))
     return list(rows.values())
 
 
@@ -51,19 +55,20 @@ def merge_financials(
     market: str,
     fetched_at: str,
 ) -> list[dict]:
-    balances: dict[str, dict] = {}
+    balances: dict[tuple[str, int, int], dict] = {}
     for row in balance_rows:
         stock_id = str(first_value(row, "公司代號", "SecuritiesCompanyCode") or "").strip()
-        if is_stock_code(stock_id):
-            balances[stock_id] = row
+        period = _period(row)
+        if is_stock_code(stock_id) and period is not None:
+            balances[(stock_id, *period)] = row
 
     result = []
     for income in income_rows:
         stock_id = str(first_value(income, "公司代號", "SecuritiesCompanyCode") or "").strip()
-        year_roc = clean_num(first_value(income, "年度", "Year"))
-        quarter = clean_num(first_value(income, "季別", "Season"))
-        if not is_stock_code(stock_id) or year_roc is None or quarter is None:
+        period = _period(income)
+        if not is_stock_code(stock_id) or period is None:
             continue
+        year, quarter = period
 
         revenue = clean_num(first_value(income, "營業收入", "OperatingRevenue"))
         gross_profit = clean_num(first_value(
@@ -77,7 +82,7 @@ def merge_financials(
         ))
         eps = clean_num(first_value(income, "基本每股盈餘（元）", "基本每股盈餘(元)", "BasicEarningsLossPerShare"))
 
-        balance = balances.get(stock_id, {})
+        balance = balances.get((stock_id, year, quarter), {})
         total_assets = clean_num(first_value(balance, "資產總額", "資產總計", "TotalAssets"))
         total_liabilities = clean_num(first_value(balance, "負債總額", "負債總計", "TotalLiabilities"))
         equity = clean_num(first_value(
@@ -91,7 +96,7 @@ def merge_financials(
         roe = net_income / equity * 100 if net_income is not None and equity else None
 
         result.append({
-            "stock_id": stock_id, "year": int(year_roc + 1911), "quarter": int(quarter),
+            "stock_id": stock_id, "year": year, "quarter": quarter,
             "revenue": _integer(revenue), "gross_profit": _integer(gross_profit),
             "operating_income": _integer(operating_income), "net_income": _integer(net_income),
             "total_assets": _integer(total_assets),
@@ -106,3 +111,17 @@ def merge_financials(
 
 def _integer(value: float | None) -> int | None:
     return int(value) if value is not None else None
+
+
+def _period(row: dict) -> tuple[int, int] | None:
+    year_value = clean_num(first_value(row, "年度", "Year"))
+    quarter_value = clean_num(first_value(row, "季別", "Season"))
+    if year_value is None or quarter_value is None:
+        return None
+    year = int(year_value)
+    quarter = int(quarter_value)
+    if year < 1911:
+        year += 1911
+    if quarter not in (1, 2, 3, 4):
+        return None
+    return year, quarter

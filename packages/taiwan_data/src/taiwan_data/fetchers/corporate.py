@@ -38,7 +38,7 @@ def fetch_twse_dividends(start: date, end: date, session=None) -> list[dict]:
         session=session,
     )
     if payload.get("stat") != "OK":
-        return []
+        raise RuntimeError(f"TWSE 除權息查詢失敗：{payload.get('stat')}")
     # 0 資料日期（115年09月01日）、1 代號、3 除權息前收盤價、4 除權息參考價
     return _dividend_rows(payload.get("data"))
 
@@ -52,7 +52,7 @@ def fetch_tpex_dividends(start: date, end: date, session=None) -> list[dict]:
     )
     tables = payload.get("tables") or []
     if str(payload.get("stat", "")).lower() != "ok" or not tables:
-        return []
+        raise RuntimeError(f"TPEX 除權息查詢失敗：{payload.get('stat')}")
     # 欄位順序與 TWSE 相同：0 除權息日期（115/09/01）、1 代號、3 前收盤、4 參考價
     return _dividend_rows(tables[0].get("data"))
 

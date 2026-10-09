@@ -1,6 +1,8 @@
 from taiwan_data.fetchers.revenue import fetch_month, latest_published_month
 from datetime import date
 
+import pytest
+
 
 HTML = """
 <table><tr>
@@ -30,3 +32,14 @@ def test_revenue_parser_and_publish_cutoff():
     assert rows[0]["yoy_pct"] == 32.39
     assert latest_published_month(date(2026, 10, 9)) == (2026, 8)
     assert latest_published_month(date(2026, 10, 11)) == (2026, 9)
+
+
+def test_revenue_rejects_a_silent_single_market_gap():
+    class PartialSession(Session):
+        def get(self, url, **kwargs):
+            if "/otc/" in url:
+                raise ConnectionError("otc unavailable")
+            return Response()
+
+    with pytest.raises(RuntimeError, match="市場資料不完整"):
+        fetch_month(2026, 8, PartialSession())

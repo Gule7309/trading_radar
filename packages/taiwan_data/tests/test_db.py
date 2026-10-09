@@ -28,3 +28,23 @@ def test_ingest_records_success_and_failure(tmp_path):
     assert row["status"] == "success"
     assert row["row_count"] == 3
 
+
+def test_replace_date_window_removes_corrected_and_withdrawn_rows(tmp_path):
+    store = DataStore(tmp_path / "test.sqlite")
+    store.ensure_schema()
+    store.upsert("notice_events", [
+        {"stock_id": "2330", "notice_date": "2026-10-08", "reason": "舊原因", "market": "TWSE"},
+        {"stock_id": "1101", "notice_date": "2026-09-01", "reason": "區間外", "market": "TWSE"},
+    ], ("stock_id", "notice_date", "reason"))
+
+    result = store.replace_date_window(
+        "notice_events", "notice_date", "2026-10-01", "2026-10-31",
+        [{"stock_id": "2330", "notice_date": "2026-10-08", "reason": "更正原因", "market": "TWSE"}],
+        ("stock_id", "notice_date", "reason"),
+    )
+
+    assert result == {"deleted": 1, "inserted": 1}
+    assert store.scalar("SELECT COUNT(*) FROM notice_events WHERE reason='舊原因'") == 0
+    assert store.scalar("SELECT COUNT(*) FROM notice_events WHERE reason='更正原因'") == 1
+    assert store.scalar("SELECT COUNT(*) FROM notice_events WHERE reason='區間外'") == 1
+

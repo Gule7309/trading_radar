@@ -78,7 +78,11 @@ class RefreshService:
         errors: dict[str, str] = {}
         for name, step in steps:
             try:
-                results[name] = step()
+                result = step()
+                results[name] = result
+                if isinstance(result, dict) and result.get("status") == "partial":
+                    details = result.get("partial_days") or result.get("error") or "partial result"
+                    errors[name] = f"partial: {details}"
             except Exception as exc:
                 errors[name] = f"{type(exc).__name__}: {exc}"
         results["errors"] = errors
@@ -174,6 +178,7 @@ class RefreshService:
             "days": processed_days, "prices": total_prices,
             "institutional": total_institutional,
             "as_of": self.store.max_value("daily_prices", "trade_date"),
+            "status": "partial" if partial_days else "success",
             "partial_days": partial_days,
         }
 
@@ -257,6 +262,7 @@ class RefreshService:
                 error="\n".join(partial_days) if partial_days else None,
             )
         return {"days": processed_days, "rows": total, "as_of": as_of,
+                "status": "partial" if partial_days else "success",
                 "partial_days": partial_days}
 
     def refresh_dividends(self, *, until: date | None = None,
@@ -266,18 +272,24 @@ class RefreshService:
         since = (date.fromisoformat(last) - timedelta(days=DIVIDEND_REFETCH_DAYS)
                  if last else until - timedelta(days=DIVIDEND_REFETCH_DAYS))
         total = 0
+        deleted = 0
         with self.store.ingest("dividend_events", DIVIDEND_SOURCES) as run:
             for start, end in _month_chunks(since, until):
                 rows = fetch_twse_dividends(start, end, session=self.session)
                 if delay:
                     time.sleep(delay)
                 rows += fetch_tpex_dividends(start, end, session=self.session)
-                total += self.store.upsert("dividend_events", rows, ("stock_id", "ex_date"))
+                replaced = self.store.replace_date_window(
+                    "dividend_events", "ex_date", start, end, rows,
+                    ("stock_id", "ex_date"),
+                )
+                total += replaced["inserted"]
+                deleted += replaced["deleted"]
                 if delay:
                     time.sleep(delay)
             as_of = self.store.max_value("dividend_events", "ex_date")
             run.update(row_count=total, as_of_value=as_of)
-        return {"rows": total, "as_of": as_of}
+        return {"rows": total, "deleted": deleted, "as_of": as_of}
 
     def refresh_disposition(self, *, until: date | None = None,
                             delay: float = 0.8) -> dict[str, object]:
@@ -288,26 +300,40 @@ class RefreshService:
             self.store.max_value("notice_events", "notice_date"),
         )), default=None)
         since = (date.fromisoformat(last) if last else until) - timedelta(days=EVENT_REFETCH_DAYS)
-        disposition = notice = 0
+        disposition = notice = disposition_deleted = notice_deleted = 0
         with self.store.ingest("disposition_events", DISPOSITION_SOURCES) as run:
             for start, end in _month_chunks(since, until):
+                disposition_rows = []
+                notice_rows = []
                 for fetcher in (fetch_twse_disposition, fetch_tpex_disposition):
-                    disposition += self.store.upsert(
-                        "disposition_events", fetcher(start, end, session=self.session),
-                        ("stock_id", "start_date", "end_date"),
-                    )
+                    disposition_rows.extend(fetcher(start, end, session=self.session))
                     if delay:
                         time.sleep(delay)
                 for fetcher in (fetch_twse_notice, fetch_tpex_notice):
-                    notice += self.store.upsert(
-                        "notice_events", fetcher(start, end, session=self.session),
-                        ("stock_id", "notice_date", "reason"),
-                    )
+                    notice_rows.extend(fetcher(start, end, session=self.session))
                     if delay:
                         time.sleep(delay)
+                disposition_result = self.store.replace_date_window(
+                    "disposition_events", "announce_date", start, end, disposition_rows,
+                    ("stock_id", "start_date", "end_date"),
+                )
+                notice_result = self.store.replace_date_window(
+                    "notice_events", "notice_date", start, end, notice_rows,
+                    ("stock_id", "notice_date", "reason"),
+                )
+                disposition += disposition_result["inserted"]
+                notice += notice_result["inserted"]
+                disposition_deleted += disposition_result["deleted"]
+                notice_deleted += notice_result["deleted"]
             as_of = self.store.max_value("notice_events", "notice_date")
             run.update(row_count=disposition + notice, as_of_value=as_of)
-        return {"disposition": disposition, "notice": notice, "as_of": as_of}
+        return {
+            "disposition": disposition,
+            "notice": notice,
+            "disposition_deleted": disposition_deleted,
+            "notice_deleted": notice_deleted,
+            "as_of": as_of,
+        }
 
     def refresh_delisted(self) -> dict[str, object]:
         with self.store.ingest("delisted_stocks", DELISTED_SOURCES) as run:

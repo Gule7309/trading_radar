@@ -221,6 +221,64 @@ class DataStore:
             conn.commit()
         return len(materialized)
 
+    def replace_date_window(
+        self,
+        table: str,
+        date_column: str,
+        start,
+        end,
+        rows: Iterable[Mapping[str, object]],
+        key_columns: Sequence[str],
+    ) -> dict[str, int]:
+        """Atomically replace an authoritative date window, including deletions/corrections."""
+        self._check_identifier(table)
+        self._check_identifier(date_column)
+        materialized = list(rows)
+
+        columns: list[str] = []
+        sql: str | None = None
+        if materialized:
+            columns = list(materialized[0].keys())
+            if not columns or any(not _IDENTIFIER.fullmatch(c) for c in columns):
+                raise ValueError("欄位名稱不合法")
+            if any(k not in columns for k in key_columns):
+                raise ValueError(f"{table} upsert 缺少 key 欄位")
+            if any(list(row.keys()) != columns for row in materialized):
+                raise ValueError(f"{table} 每列欄位順序必須一致")
+
+        with closing(self.connect()) as conn:
+            actual = {r[1] for r in conn.execute(f"PRAGMA table_info([{table}])")}
+            if date_column not in actual:
+                raise ValueError(f"{table} 不存在日期欄位：{date_column}")
+            unknown = set(columns) - actual
+            if unknown:
+                raise ValueError(f"{table} 不存在欄位：{sorted(unknown)}")
+
+            cursor = conn.execute(
+                f"DELETE FROM [{table}] WHERE [{date_column}] BETWEEN ? AND ?",
+                (_sqlite_value(start), _sqlite_value(end)),
+            )
+            deleted = cursor.rowcount
+
+            if materialized:
+                quoted = ",".join(f"[{c}]" for c in columns)
+                placeholders = ",".join("?" for _ in columns)
+                conflict = ",".join(f"[{c}]" for c in key_columns)
+                updates = ",".join(
+                    f"[{c}]=excluded.[{c}]" for c in columns if c not in key_columns
+                )
+                action = f"DO UPDATE SET {updates}" if updates else "DO NOTHING"
+                sql = (
+                    f"INSERT INTO [{table}] ({quoted}) VALUES ({placeholders}) "
+                    f"ON CONFLICT ({conflict}) {action}"
+                )
+                conn.executemany(
+                    sql,
+                    [tuple(_sqlite_value(row[c]) for c in columns) for row in materialized],
+                )
+            conn.commit()
+        return {"deleted": deleted, "inserted": len(materialized)}
+
     @contextmanager
     def ingest(self, dataset: str, source: str) -> Iterator[dict[str, object]]:
         started = now_iso()
