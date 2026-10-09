@@ -1,4 +1,5 @@
 import type { LlmProvider } from "../infra/llm/provider.js";
+import { MeteredLlmProvider } from "../infra/llm/metered-provider.js";
 import type { SearchProvider } from "../infra/search/provider.js";
 import { LlmResearchController } from "../agent/llm-controller.js";
 import { DefaultToolRouter } from "../tools/default-tool-router.js";
@@ -16,23 +17,27 @@ export interface ResearchRuntime {
   controller: ResearchController;
   toolRouter: ResearchToolRouter;
   services: ResearchHarnessServices;
+  telemetry: MeteredLlmProvider;
 }
 
 export function createResearchRuntime(
   llm: LlmProvider,
   search: SearchProvider,
 ): ResearchRuntime {
+  const telemetry = new MeteredLlmProvider(llm);
+
   return {
-    controller: new LlmResearchController(llm),
+    controller: new LlmResearchController(telemetry),
     toolRouter: new DefaultToolRouter(search),
     services: {
       verificationPipeline: new DefaultVerificationPipeline(
-        new LlmClaimExtractor(llm),
-        new LlmTextualVerifier(llm),
-        new LlmRiskExtractor(llm),
+        new LlmClaimExtractor(telemetry),
+        new LlmTextualVerifier(telemetry),
+        new LlmRiskExtractor(telemetry),
       ),
-      skeptic: new LlmSkeptic(llm),
-      thesisCompiler: new LlmThesisCompiler(llm),
+      skeptic: new LlmSkeptic(telemetry),
+      thesisCompiler: new LlmThesisCompiler(telemetry),
     },
+    telemetry,
   };
 }
