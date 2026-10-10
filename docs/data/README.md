@@ -80,6 +80,40 @@ powershell -ExecutionPolicy Bypass -File scripts\windows\register_daily_task.ps1
 
 上雲規劃見 [cloud-scheduling.md](cloud-scheduling.md)。
 
+## 資料分發（給隊友）
+
+完整資料庫約 1.2 GB，不進 Git。分發方式：**雲端只存壓縮快照與 manifest，每位開發者各自在本機持有
+一份 SQLite**；不要把 SQLite 放在 Google Drive／OneDrive 同步資料夾讓多人共用，也不要多人直接讀寫
+同一個遠端檔案（容易有 sync conflict、WAL 與 lock 問題）。
+
+| kind | 內容 | 下載大小 | 用途 |
+|---|---|---|---|
+| `demo` | 全部股票主檔＋近 120 個交易日行情／籌碼＋近 24 個月營收＋近 8 季財報＋近一年事件；不含回補進度 | 約 25 MB | 開發、整合測試 |
+| `full` | 完整資料庫（2015 至今） | 約 420 MB（解壓後 1.2 GB） | 正式篩選、回測、現場 Demo |
+
+隊友取得資料（需要 `pip install -e packages/taiwan_data`）：
+
+```powershell
+$env:TAIWAN_DATA_DB = "$PWD\var\data\taiwan_stock.sqlite"
+.venv\Scripts\taiwan-data.exe download --demo     # 或省略 --demo 取得 full
+```
+
+`download` 先讀 `manifest-<kind>.json`：本機資料庫雜湊與 manifest 相同就不下載；否則下載、
+依序驗證 `.gz` 與解壓後資料庫的 SHA-256、`PRAGMA quick_check`，全部通過才以原子方式取代本機檔案。
+任何一步失敗都保留原有資料庫。若偵測到未合併的 `-wal`（可能有程序正在使用），會拒絕替換。
+
+維護者發佈（在完整資料庫沒有寫入程序時執行，例如每日排程結束後）：
+
+```powershell
+taiwan-data snapshot --kind demo --out-dir <dir> --version 2026-10-10
+taiwan-data snapshot --kind full --out-dir <dir> --version 2026-10-10
+```
+
+快照以 `VACUUM INTO` 產生（一致性備份），`.gz` 的 mtime 固定為 0，相同內容得到相同雜湊。
+產物是 `taiwan_stock_<kind>_<version>.sqlite.gz` 與 `manifest-<kind>.json`，上傳到 GitHub Release
+`data-latest`（預設下載來源，可用 `--source` 指向其他 URL 或本機資料夾）。demo 是唯讀開發用資料，
+回補與每日更新只應在完整資料庫上執行。
+
 ## 資料語意與已知限制
 
 - **`quarterly_financials` 原欄位仍是「年初至今累計」**；`*_quarter` 才是真單季值。
