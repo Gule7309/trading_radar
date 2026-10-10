@@ -1,38 +1,43 @@
 # Integration Guide
 
-## A -> B
+## Current boundary
 
-B accepts `CandidatePacket` objects from A.
+The repository now has a concrete A -> B contract from Data PR #5:
 
-Example:
-
-```json
-{
-  "candidateId": "a-2330-2026-10-10",
-  "ticker": "2330",
-  "companyName": "台積電",
-  "market": "TWSE",
-  "industry": "半導體業",
-  "asOf": "2026-10-10",
-  "quantScore": 0.91,
-  "quantSignals": [
-    {
-      "metric": "revenue_yoy",
-      "value": 0.5332,
-      "period": "2026-08",
-      "industryPercentile": 95
-    }
-  ],
-  "hardConstraintsPassed": true
-}
+```text
+screening-output-v1
+  candidates[]
+  evidence[]
+  riskFlags
+  dataVersion / sourceSnapshot
+        ↓
+B screening adapter
+        ↓
+CandidatePacket + upstreamEvidence
+        ↓
+dynamic research / verification / thesis
+        ↓
+ResearchResult / Top-K
+        ↓
+C frontend
 ```
 
-A owns hard constraints. B never auto-relaxes them.
+B preserves A's quantitative evidence lineage instead of throwing it away and re-fetching the same facts.
 
 ## Start B
 
+### Frontend / contract development without model credentials
+
 ```bash
 npm install
+npm run api:mock
+```
+
+No Gemini/OpenAI key is required.
+
+### Real current runtime
+
+```bash
 npm run api
 ```
 
@@ -53,29 +58,26 @@ CORS_ORIGIN=http://localhost:5173
 SQLITE_PATH=trading-radar.sqlite
 ```
 
-## Single candidate research
+Provider credentials stay on the backend. C should never call Gemini/OpenAI directly.
+
+## A screening output -> B research (preferred integration)
 
 ```http
-POST /api/research/runs
+POST /api/research/screening-output
 Content-Type: application/json
 ```
 
-Body = one `CandidatePacket`.
-
-This MVP endpoint is synchronous. C should show a loading/researching state while it runs.
-
-## Batch candidates -> Top 5
-
-```http
-POST /api/research/batch
-Content-Type: application/json
-```
-
-Example:
+Request:
 
 ```json
 {
-  "candidates": [],
+  "screeningOutput": {
+    "schemaVersion": "screening-output-v1",
+    "run": {},
+    "candidates": [],
+    "evidence": [],
+    "excluded": {}
+  },
   "options": {
     "topK": 5,
     "researchLimit": 10,
@@ -88,7 +90,74 @@ Example:
 }
 ```
 
-For a full A candidate pass, set `researchLimit` up to 30. The smaller default is a hackathon cost/latency tradeoff.
+B validates the Data Layer v1 contract, adapts the candidates internally, and returns:
+
+```json
+{
+  "screeningRunId": "20261010-001",
+  "dataVersion": "ds-...",
+  "sourceSnapshot": "sha256:...",
+  "researched": 10,
+  "rejectedOrSkipped": [],
+  "top": []
+}
+```
+
+Important adapter behavior:
+
+- A percentile is 0–1; B's existing signal field is normalized to 0–100.
+- A `riskFlags` are preserved.
+- verified A Evidence is preserved as `upstreamEvidence`.
+- A's official evidence becomes Tier-1 B source material.
+- B does not repeat the same monthly-revenue lookup when A already supplied verified monthly-revenue evidence.
+- non-verified A evidence is rejected by the adapter rather than silently trusted.
+
+## Internal CandidatePacket
+
+Direct single-candidate / custom integrations may still use `CandidatePacket`:
+
+```json
+{
+  "candidateId": "20261010-001:2330",
+  "ticker": "2330",
+  "companyName": "台積電",
+  "market": "TWSE",
+  "industry": "半導體業",
+  "asOf": "2026-10-10",
+  "quantScore": 0.91,
+  "quantSignals": [
+    {
+      "metric": "revenue_yoy",
+      "value": 53.32,
+      "period": "2026-08",
+      "industryPercentile": 95
+    }
+  ],
+  "hardConstraintsPassed": true,
+  "riskFlags": ["notice"],
+  "upstreamEvidence": []
+}
+```
+
+A owns screening hard constraints. B never auto-relaxes them.
+
+## Single candidate research
+
+```http
+POST /api/research/runs
+Content-Type: application/json
+```
+
+Body = one `CandidatePacket`.
+
+## Batch CandidatePacket research
+
+```http
+POST /api/research/batch
+Content-Type: application/json
+```
+
+For new A integrations, prefer `/api/research/screening-output` so Evidence lineage is not lost.
 
 ## Research history
 
@@ -173,11 +242,11 @@ Development-only:
 - `metrics.totalLatencyMs`
 - `metrics.estimatedCostUsd`
 
-Do not render metrics or the internal ranking score as a probability that the stock will rise.
+Do not render metrics or internal ranking scores as a probability that the stock will rise.
 
 ## Source UI
 
-For each claim/risk, C can map `sourceIds` into `sources` and display:
+For each claim/risk, C maps `sourceIds` into `sources` and may display:
 
 - title
 - publisher
@@ -191,18 +260,15 @@ Tier-3 search snippets should not appear as verified evidence cards.
 
 ## Trace UI
 
-`researchTrace` can power an expandable timeline such as:
-
-```text
-1 Official revenue search
-2 Web discovery
-3 Fetch source
-4 Verify claims
-5 Skeptic (conditional)
-6 Publication gate
-```
+`researchTrace` can power an expandable operational timeline.
 
 Do not display hidden chain-of-thought. Only structured action summaries/reason codes are stored.
+
+## Frontend timing
+
+C can start immediately using `npm run api:mock`.
+
+See `docs/FRONTEND_HANDOFF.md`.
 
 ## Provider migration
 
@@ -213,4 +279,4 @@ LlmProvider -> controller/extractor/verifier/skeptic/thesis
 SearchProvider -> discovery
 ```
 
-Gemini is the current development runtime. Later OpenAI migration should be an adapter/configuration change rather than a rewrite of A/B/C contracts.
+Gemini is the current development runtime. Later OpenAI migration is an adapter/configuration change, not an A/B/C contract rewrite.
