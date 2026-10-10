@@ -77,6 +77,18 @@ function addTrace(
   });
 }
 
+function mergeUniqueById<T>(
+  existing: T[],
+  incoming: T[],
+  getId: (value: T) => string,
+): T[] {
+  const byId = new Map(existing.map((value) => [getId(value), value]));
+  for (const value of incoming) {
+    byId.set(getId(value), value);
+  }
+  return Array.from(byId.values());
+}
+
 function incrementBudget(state: ResearchState, action: ResearchAction): void {
   state.budget.stepsUsed += 1;
 
@@ -318,12 +330,26 @@ export async function researchCandidate(
       });
 
       const newSources = observation.sources ?? [];
-      state.sources.push(...newSources);
-      if (newSources.length > 0) {
+      const previousSourceCount = state.sources.length;
+      state.sources = mergeUniqueById(
+        state.sources,
+        newSources,
+        (source) => source.sourceId,
+      );
+      if (state.sources.length > previousSourceCount) {
         state.evidenceDirty = true;
       }
-      state.knownFacts.push(...(observation.knownFacts ?? []));
-      state.risks.push(...(observation.risks ?? []));
+
+      state.knownFacts = mergeUniqueById(
+        state.knownFacts,
+        observation.knownFacts ?? [],
+        (fact) => fact.factId,
+      );
+      state.risks = mergeUniqueById(
+        state.risks,
+        observation.risks ?? [],
+        (risk) => risk.riskId,
+      );
 
       addTrace(state, decision, observation.summary, action.type);
 
