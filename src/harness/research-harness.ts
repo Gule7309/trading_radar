@@ -22,6 +22,7 @@ import {
 } from "./budgets.js";
 import { evaluatePublicationGate } from "./publication-gate.js";
 import { enforceControllerPolicy } from "./controller-policy.js";
+import { assessSourceFreshness } from "../evidence/freshness.js";
 
 export interface ResearchHarnessServices {
   verificationPipeline?: VerificationPipeline;
@@ -159,6 +160,31 @@ function computeVerificationSummary(state: ResearchState) {
     (source) => source.sourceTier === 1,
   );
 
+  const riskSourceIds = new Set(
+    state.risks.flatMap((risk) => risk.sourceIds),
+  );
+  const publishedSourceIds = new Set([
+    ...evidenceSourceIds,
+    ...riskSourceIds,
+  ]);
+  const publishedSources = state.sources.filter((source) =>
+    publishedSourceIds.has(source.sourceId),
+  );
+  const freshnessChecks = publishedSources
+    .filter(
+      (source) =>
+        source.sourceType === "NEWS" || source.sourceType === "OTHER",
+    )
+    .map((source) =>
+      assessSourceFreshness(source, state.candidate.asOf, 120),
+    );
+  const freshness =
+    freshnessChecks.some((item) => item.known && !item.fresh)
+      ? "STALE"
+      : freshnessChecks.some((item) => !item.known)
+        ? "UNKNOWN"
+        : "CURRENT";
+
   return {
     coreClaimCoverage:
       coreClaims.length === 0 ? 0 : supportedCore.length / coreClaims.length,
@@ -168,6 +194,7 @@ function computeVerificationSummary(state: ResearchState) {
         : primarySources.length / evidenceSources.length,
     unresolvedConflicts: state.conflicts.filter((conflict) => !conflict.resolved)
       .length,
+    freshness,
   };
 }
 
@@ -209,6 +236,8 @@ function compileResult(
       claimId: claim.claimId,
       text: claim.text,
       status: claim.status,
+      category: claim.category,
+      importance: claim.importance,
       sourceIds: sourceIdsByClaim.get(claim.claimId) ?? [],
     })),
     risks: state.risks.map((risk) => ({
@@ -222,6 +251,7 @@ function compileResult(
       title: source.title,
       url: source.url,
       publisher: source.publisher,
+      sourceType: source.sourceType,
       publishedAt: source.publishedAt,
       dataPeriod: source.dataPeriod,
       sourceTier: source.sourceTier,
