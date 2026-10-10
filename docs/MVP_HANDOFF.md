@@ -64,6 +64,18 @@ ResearchResult
 
 ## API handoff to C
 
+C can start immediately with:
+
+```bash
+npm run api:mock
+```
+
+Preferred A-to-B entry:
+
+- `POST /api/research/screening-output`
+
+Other endpoints:
+
 - `POST /api/research/runs`
 - `POST /api/research/batch`
 - `GET /api/research/runs/:runId`
@@ -74,7 +86,7 @@ ResearchResult
 - `GET /api/theses/:thesisId/versions`
 - `GET /api/theses/:thesisId/events`
 
-See `docs/INTEGRATION.md` for payload details.
+See `docs/INTEGRATION.md` for payload details and `docs/FRONTEND_HANDOFF.md` for the C workflow.
 
 ## Evidence policy
 
@@ -110,6 +122,6 @@ Not required for the current MVP:
 ## Before merge
 
 1. GitHub CI must pass both Node and `taiwan_data` jobs.
-2. Run one current live Gemini candidate after the latest policy changes.
-3. Confirm C can consume `ResearchResult` / batch endpoints.
+2. Run one current live Gemini screening-output request after the latest A-evidence ingestion changes.
+3. Confirm C can consume the same endpoints first with mock mode, then one live request.
 4. Keep the PR draft until the team is ready to integrate.
