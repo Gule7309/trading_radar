@@ -198,6 +198,8 @@ export interface ResearchResult {
     claimId: string;
     text: string;
     status: ClaimStatus;
+    category?: Claim["category"];
+    importance?: Claim["importance"];
     sourceIds: string[];
   }>;
   risks: Array<{
@@ -211,6 +213,7 @@ export interface ResearchResult {
     title: string;
     url: string;
     publisher: string;
+    sourceType?: SourceDocument["sourceType"];
     publishedAt?: string;
     dataPeriod?: string;
     sourceTier: number;
@@ -219,6 +222,7 @@ export interface ResearchResult {
     coreClaimCoverage: number;
     primarySourceRatio: number;
     unresolvedConflicts: number;
+    freshness?: "CURRENT" | "STALE" | "UNKNOWN";
   };
   researchTrace: ResearchTraceStep[];
   diagnostics?: ResearchDiagnostic[];
