@@ -1,164 +1,462 @@
 # B Module — Agent / Evidence MVP
 
-## Goal
+## 1. Goal
 
-Turn an upstream `CandidatePacket` into a grounded `ResearchResult` with:
+B turns an upstream `CandidatePacket` into evidence-grounded stock research that C can render and monitor.
 
-- adaptive research actions,
-- explicit research state,
-- claim/evidence linkage,
-- deterministic publication gates,
-- risk disclosure,
-- execution trace,
-- clear reject/stop reasons.
+The MVP is not a price predictor and does not auto-trade. It is an evidence-seeking research system with explicit stop conditions, verification, risks, and thesis invalidation rules.
 
-## MVP architecture
+Core product rule:
+
+> LLMs interpret text; deterministic code enforces policy.
+
+## 2. Current architecture
 
 ```text
-CandidatePacket
-    ↓
-Research Controller
-    ↓
+A CandidatePacket
+      ↓
+BatchResearchService (optional 20–30 candidate entry)
+      ↓
+ResearchService
+      ↓
+Research Harness / Controller
+      ↓
 typed ResearchAction
-    ↓
-Tool Router
-    ↓
-Observation / SourceDocument
-    ↓
-ResearchState
-    ↓
-Claim / Evidence verification
-    ↓
+      ├── SEARCH_OFFICIAL
+      ├── SEARCH_NEWS
+      ├── FETCH_SOURCE
+      ├── VERIFY
+      ├── RUN_SKEPTIC
+      ├── FINALIZE
+      └── REJECT
+      ↓
+Tool Router + bounded retry
+      ├── TWSE / TPEx monthly revenue
+      ├── material disclosures
+      ├── Google Search grounding (discovery-only)
+      └── guarded direct-page fetch
+      ↓
+Source eligibility
+      ├── entity match
+      ├── freshness
+      └── source tier
+      ↓
+Verification Pipeline
+      ├── deterministic quant-signal verifier
+      ├── atomic claim extractor
+      ├── isolated textual verifier
+      ├── conflict detector
+      └── risk extractor
+      ↓
 Publication Gate
-    ↓
+      ↓
 ResearchResult
+      ↓
+Top-K evidence-aware ranking
+      ↓
+C UI / Thesis tracker
 ```
 
-The first implementation intentionally uses a **single controller** instead of a full multi-agent system. This keeps the harness debuggable and lets us measure whether extra coordination actually improves results before adding it.
+Saved stock flow:
 
-## Current P0 status
+```text
+ResearchResult
+  ↓
+Thesis v1
+  ↓
+new monthly revenue / disclosure / manual recheck
+  ↓
+new ResearchResult
+  ↓
+ACTIVE / STRENGTHENED / UNCHANGED / WEAKENED / INVALIDATED
+  ↓
+Thesis v2 + event history
+```
 
-Implemented in the first skeleton:
+## 3. Provider strategy
 
-- `CandidatePacket`
-- `ResearchState`
-- `ResearchResult`
-- `ResearchAction`
-- finite-loop research harness
-- step/search/skeptic budgets
-- mock tool router
-- execution trace
-- deterministic publication gate
-- mock end-to-end demo
-- publication gate and harness tests
+The core system is provider-neutral.
 
-Implemented since the initial scaffold:
+```text
+LlmProvider
+  → Controller
+  → Claim Extraction
+  → Verifier
+  → Risk Extraction
+  → Skeptic
+  → Thesis Compiler
 
-- keyless TWSE / TPEx monthly revenue adapters
-- material disclosure normalization and adapters
-- provider-neutral dynamic news search contract
-- provider-neutral structured LLM contract
-- atomic claim extraction service
-- deterministic numeric verifier
-- isolated textual verifier
-- conflict detector
-- source-grounded risk extractor
-- conditional skeptic service
-- verified-evidence thesis compiler
-- injectable verification pipeline
-- HTTP timeout / retry policy
-- CI typecheck + tests
+SearchProvider
+  → dynamic web discovery
+```
 
-Current live stack:
+Current development runtime:
 
-- Gemini structured-output adapter for the hackathon development phase
-- Gemini Google Search grounding as discovery-only web search
-- TWSE / TPEx official adapters
-- guarded direct-page fetch before web evidence can support publication
-- SQLite thesis persistence / recheck
-- E01–E10 eval scenario catalog and repeat-run harness
+```env
+LLM_PROVIDER=gemini
+SEARCH_PROVIDER=gemini-google-search
+GEMINI_MODEL=gemini-3.8-flash
+GEMINI_SEARCH_MODEL=gemini-3.8-flash
+```
 
-Still pending:
+Gemini is temporary for current development because credentials are available. A later OpenAI migration should add an OpenAI `LlmProvider` adapter and change configuration; the harness, evidence ledger, publication gate, storage, and A/B/C contracts should not change.
 
-- run the full E01–E10 live evaluation suite and record reliability / latency / cost
-- tune research budgets and controller policy from live eval results
-- add the production OpenAI adapter when the team is ready to switch providers
+## 4. Source model
 
-## Design sources
+### Tier 1 — primary / official
 
-The architecture is inspired by:
+- TWSE
+- TPEx
+- MOPS-compatible disclosure feeds
+- company IR when added
 
-- **ReAct**: interleave reasoning/action/observation.
-- **Self-RAG / FLARE**: retrieve when evidence is needed rather than following a fixed retrieval script.
-- **FActScore**: decompose long-form findings into atomic factual claims.
-- **FEVER**: map claims to supporting/refuting/insufficient evidence.
-- **RARR / Chain-of-Verification**: independently verify and revise unsupported claims.
-- **CRITIC**: use external tools for critique/correction.
-- **TradingAgents**: borrow adversarial financial review, but only as a conditional skeptic in later phases.
-- **FinMem**: maintain temporal financial memory; later implemented as versioned thesis state.
-- **ALCE / SAFE / tau-bench**: evaluate citation quality, factual support, and repeat-run reliability.
+Financial core claims require Tier-1 support.
 
-## Key engineering rule
+### Tier 2 — directly fetched secondary source
 
-**LLMs interpret text; code enforces policy.**
+A web article becomes Tier 2 only after the underlying page is fetched and inspected.
 
-Use LLM calls for:
+### Tier 3 — discovery-only
 
-- query formation,
-- claim extraction,
-- textual evidence judgment,
-- risk synthesis,
-- thesis synthesis.
+Google Search grounding snippets are Tier 3. They may guide the next search/fetch action but cannot directly support a published core claim or published risk.
 
-Use deterministic code for:
+Low-signal social sources such as Facebook / YouTube / Instagram / TikTok / X are deprioritized during discovery.
 
-- budgets,
-- dates,
-- numeric recalculation,
-- required fields,
-- state transitions,
-- publication rules,
-- reject conditions.
+## 5. Evidence eligibility
 
-## Next implementation slice
+Before a source can be used by the verification pipeline:
 
-1. Replace mock official source with a TWSE adapter.
-2. Add a provider-neutral news search interface.
-3. Add claim extraction.
-4. Add deterministic numeric verification.
-5. Add textual verifier.
-6. Add retry/fallback and conflict handling.
+- Tier 3 is excluded.
+- Wrong-entity evidence is excluded.
+- stale non-official sources are excluded.
+- unknown-freshness non-official sources are excluded.
+- official sources are accepted only for the candidate ticker.
 
+Fetched source content is always treated as untrusted data. Instruction-like text is flagged in metadata and never receives authority over agent policy or tools.
 
-## Provider strategy
+## 6. Research harness
 
-The core architecture is intentionally provider-neutral.
+Default budget:
 
-`LlmProvider` isolates controller, claim extraction, verification, skeptic, and thesis compilation from any specific model vendor. `SearchProvider` similarly isolates dynamic discovery. The current hackathon development runtime uses Gemini because credentials are available now; the intended later migration to OpenAI should be implemented as another adapter rather than by changing the harness, domain models, evidence ledger, or publication policy.
+```text
+maxSteps = 12
+maxSearches = 5
+maxSkepticRounds = 1
+maxDurationMs = 180000
+tool retries = 2 attempts at the runtime router
+```
 
-## Gemini implementation
+These are operational defaults, not theoretical optima.
 
-The current development runtime uses the Google Gen AI SDK through that provider-neutral adapter.
+Important deterministic guards:
 
-Default model:
+- the LLM cannot declare `BUDGET_EXHAUSTED`; only the harness can.
+- if Tier-1 + fetched Tier-2 evidence exist and claims are not verified, the harness forces `VERIFY`.
+- new evidence marks `evidenceDirty`; verify again before skeptic/finalization.
+- skeptic cannot run before verified claims exist.
+- unnecessary skeptic calls are skipped.
+- a search/fetch is blocked before it would exceed its budget.
+- tool failures can fall back to another research path instead of fabricating data.
 
-- `gemini-3.8-flash` for structured controller / extraction / verification / skeptic / thesis tasks.
-- `gemini-3.8-flash` with Google Search grounding for dynamic web research.
+## 7. Verification
 
-The model names remain environment-configurable through `GEMINI_MODEL` and
-`GEMINI_SEARCH_MODEL`.
+### Atomic textual claims
 
-Structured model calls use JSON Schema converted from the existing Zod schemas.
-Dynamic search keeps grounded citation URLs and cited text as normalized
-`SearchResult` objects. The rest of the harness remains independent of Gemini,
-so another provider can be substituted later without changing the domain layer.
+Long-form source material is converted into atomic claims, then each claim is separately checked against the cited source excerpt.
 
-Local live run:
+Statuses:
+
+- `SUPPORTED`
+- `REFUTED`
+- `INSUFFICIENT`
+- `CONFLICTING`
+
+### Deterministic numeric claims
+
+Known quant metrics from A are checked against normalized official source metadata without relying on an LLM.
+
+Currently mapped:
+
+- `revenue_yoy`
+- `revenue_mom`
+- `monthly_revenue`
+- `cumulative_revenue_yoy`
+
+Percentage signals support both ratio form (`0.35`) and percent form (`35`).
+
+### Conflicts
+
+If the same claim has both supporting and refuting evidence, a core claim becomes a HIGH conflict and cannot be published until resolved.
+
+## 8. Publication gate
+
+A result cannot become `PUBLISHABLE` unless:
+
+1. at least one core claim exists;
+2. every core claim is supported;
+3. financial core claims have Tier-1 evidence;
+4. core claims are not supported only by discovery snippets;
+5. at least one grounded risk exists;
+6. risks are not supported only by discovery snippets;
+7. no unresolved HIGH conflict remains.
+
+`don't know` / reject is a valid product result.
+
+## 9. Research quality
+
+Do not use an arbitrary model confidence probability.
+
+The result exposes:
+
+- `coreClaimCoverage`
+- `primarySourceRatio`
+- `unresolvedConflicts`
+- `freshness = CURRENT | STALE | UNKNOWN`
+
+Batch ranking derives a deterministic Evidence Quality score:
+
+```text
+0.50 core-claim coverage
++ 0.30 primary-source ratio
++ 0.15 freshness
++ 0.05 no-conflict factor
+```
+
+The current Top-K ranking default is:
+
+```text
+0.60 upstream quantScore
++ 0.40 evidence quality
+```
+
+These are configurable MVP heuristics and must not be presented as probability of price appreciation.
+
+## 10. Batch / Top 5
+
+`BatchResearchService` supports the product path from A's candidate list to Top-K research results.
+
+Defaults:
+
+- `topK = 5`
+- `researchLimit = 10`
+- `concurrency = 2`
+
+Hard-constraint failures are never researched. The default research limit controls hackathon API cost; callers can increase it up to 30 to research the full A candidate set.
+
+## 11. Thesis tracking
+
+A publishable result can create Thesis v1.
+
+Recheck behavior:
+
+- refuted previous core claim → `INVALIDATED`
+- conflicting / insufficient previous core claim → `WEAKENED`
+- new supported core claim → `STRENGTHENED`
+- no material verified change → `UNCHANGED`
+- non-publishable recheck → preserve prior thesis and record `UNCHANGED` with an explicit reason
+
+Thesis versions and events are persisted in SQLite.
+
+## 12. Storage
+
+SQLite currently stores:
+
+- research runs
+- full `ResearchResult`
+- thesis versions
+- thesis events
+
+Local file default:
+
+```text
+trading-radar.sqlite
+```
+
+It is ignored by git.
+
+## 13. API
+
+Run:
 
 ```bash
-export GEMINI_API_KEY="..."
-npm install
-npm run demo:gemini -- 2330 台積電 TWSE 半導體業
+npm run api
 ```
 
-Do not commit API keys or paste them into research artifacts.
+Default:
+
+```text
+http://127.0.0.1:8787
+```
+
+Research:
+
+- `POST /api/research/runs`
+- `POST /api/research/batch`
+- `GET /api/research/runs/:runId`
+- `GET /api/research/tickers/:ticker/runs`
+
+Thesis:
+
+- `POST /api/theses`
+- `POST /api/theses/:thesisId/recheck`
+- `GET /api/theses/:thesisId`
+- `GET /api/theses/:thesisId/versions`
+- `GET /api/theses/:thesisId/events`
+
+See `docs/INTEGRATION.md`.
+
+## 14. Metrics
+
+Each persisted run may expose:
+
+- LLM call count
+- input tokens
+- output tokens
+- LLM latency
+- total run latency
+- estimated provider cost when the adapter supplies it
+
+These metrics are development/evaluation telemetry, never investment confidence.
+
+## 15. Security
+
+Implemented MVP controls:
+
+- external content marked untrusted;
+- localhost / private IP / non-http fetch targets blocked;
+- redirects revalidated;
+- body size / fetch size bounded;
+- script/style/noscript content removed before model use;
+- instruction-like source text flagged;
+- external pages cannot specify tools;
+- tool calls remain typed/schema-controlled;
+- secrets stay in environment variables;
+- API key patterns are redacted from Gemini request errors.
+
+## 16. Evaluation
+
+Offline deterministic invariant suite:
+
+```bash
+npm run eval:offline
+```
+
+It maps E01–E10 to executable safeguards:
+
+- E01 normal growth
+- E02 one-off revenue
+- E03 margin deterioration
+- E04 source conflict
+- E05 official-source failure / retry
+- E06 stale-news trap
+- E07 wrong entity
+- E08 unsupported causal story
+- E09 prompt injection
+- E10 thesis invalidation
+
+General tests:
+
+```bash
+npm run typecheck
+npm test
+```
+
+Repeat-run eval harness supports 3-run reliability summaries.
+
+Live semantic E01–E10 evaluation is intentionally separate from deterministic tests because it needs a live model/search provider and incurs latency/cost.
+
+## 17. Development status
+
+### P0 — implemented
+
+- A/B and B/C contracts
+- typed research harness
+- explicit state
+- TWSE / TPEx official tools
+- dynamic search abstraction
+- direct-page fetch
+- evidence ledger
+- numeric verifier
+- textual verifier
+- entity/freshness source eligibility
+- publication gate
+- retries / fallback behavior
+- execution trace
+- research persistence
+- offline E01–E06 safeguards
+
+### P1 — implemented for MVP
+
+- conflict handling
+- conditional skeptic
+- thesis compiler
+- thesis versioning
+- thesis invalidation / recheck
+- SQLite thesis persistence
+- batch Top-K research
+- API integration surface
+- offline E01–E10 safeguards
+- latency/token telemetry
+
+### P2 — intentionally deferred
+
+- parallel research workers / full multi-agent orchestration
+- Agent Skills packaging
+- MCP tool server packaging
+- learned preference model / contextual bandit
+- full bull/bear debate
+- OpenAI production adapter
+- distributed job queue / cloud persistence
+
+These are not required for the current hackathon MVP.
+
+## 18. Definition of Done
+
+Static MVP DoD is satisfied when:
+
+- CandidatePacket enters the system.
+- controller chooses typed next actions from evidence gaps.
+- at least two dynamic source classes exist.
+- official numeric evidence can be verified deterministically.
+- unsupported core claims cannot publish.
+- every publishable result has a grounded risk.
+- source conflicts block publication.
+- tool failure is bounded and auditable.
+- trace is returned to C.
+- ResearchResult contract is stable.
+- research runs persist.
+- thesis can be saved and versioned.
+- thesis can be rechecked from new evidence.
+- E01–E10 offline invariants execute.
+- prompt-injection fixture exists.
+- latency/token telemetry is recorded.
+- A candidate list can produce a deterministic Top-K output.
+
+## 19. Remaining live-only validation
+
+The code can continue without user interaction up to this point. Remaining validation requires external credentials/runtime execution:
+
+1. rerun the current live Gemini path after the latest controller-policy changes;
+2. run repeated live semantic E01–E10 cases and record pass rate/latency/tokens;
+3. when switching providers, choose the production OpenAI model/credential setup and add the OpenAI adapter.
+
+These are runtime/provider validation tasks, not missing core MVP architecture.
+
+## 20. Design references
+
+Architecture/design inspirations used in this MVP:
+
+- Anthropic, *Building Effective Agents* — keep the MVP composable and avoid premature multi-agent complexity.
+- ReAct — action/observation closed loop.
+- Self-RAG / FLARE — retrieve according to evidence gaps rather than a fixed search script.
+- FEVER — supported/refuted/not-enough-evidence claim framing.
+- FActScore — atomic factual claims.
+- RARR / Chain-of-Verification — independently verify and revise unsupported claims.
+- CRITIC — external-tool critique.
+- ALCE / SAFE — citation/factuality evaluation ideas.
+- TradingAgents — financial adversarial review inspiration only; adapted as a conditional skeptic.
+- FinMem — temporal memory inspiration; adapted as versioned thesis state.
+- AgentDojo — prompt-injection threat model.
+- tau-bench — repeat-run reliability evaluation.
+
+The project deliberately adapts these design ideas rather than reproducing their training methods or full architectures.
