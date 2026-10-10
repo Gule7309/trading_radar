@@ -11,7 +11,8 @@
     "demo:official": "tsx src/live-official-demo.ts",
     "demo:gemini": "tsx src/live-gemini-demo.ts",
     "demo:gemini:smoke": "tsx src/live-gemini-smoke.ts",
-    "api": "tsx src/api/server.ts"
+    "api": "tsx src/api/server.ts",
+    "eval:offline": "vitest run tests/mvp-eval-invariants.test.ts"
   },
   "dependencies": {
     "zod": "^3.24.0",
