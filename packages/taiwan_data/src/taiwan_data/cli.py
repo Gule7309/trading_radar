@@ -8,6 +8,7 @@ from datetime import date
 
 from .bootstrap import build_snapshot, refresh_manifest
 from .db import DEFAULT_DB_ENV, DataStore
+from .distribution import DEFAULT_SOURCE, KINDS, create_snapshot, download_snapshot
 from .service import BACKFILL_START, RefreshService
 
 REFRESH_TARGETS = ("all", "market", "stocks", "revenue", "financials", "margin",
@@ -59,6 +60,20 @@ def build_parser() -> argparse.ArgumentParser:
     manifest.add_argument("--db", default=os.getenv(DEFAULT_DB_ENV))
     manifest.add_argument("--out")
     manifest.add_argument("--artifact", action="append", default=[])
+
+    snapshot = sub.add_parser("snapshot", help="建立可分發的壓縮快照（full 或 demo）與 manifest")
+    snapshot.add_argument("--db", default=os.getenv(DEFAULT_DB_ENV))
+    snapshot.add_argument("--out-dir", required=True)
+    snapshot.add_argument("--kind", choices=KINDS, default="full")
+    snapshot.add_argument("--version", help="預設為今天日期 YYYY-MM-DD")
+
+    download = sub.add_parser("download", help="下載並驗證快照到本機 SQLite（版本相同則跳過）")
+    download.add_argument("--db", default=os.getenv(DEFAULT_DB_ENV))
+    download.add_argument("--kind", choices=KINDS, default="full")
+    download.add_argument("--demo", action="store_true", help="等同 --kind demo")
+    download.add_argument("--source", default=DEFAULT_SOURCE,
+                          help="manifest 所在的 URL 或本機資料夾")
+    download.add_argument("--force", action="store_true")
     return parser
 
 
@@ -79,6 +94,13 @@ def main(argv: list[str] | None = None) -> None:
         if not args.db:
             raise ValueError(f"請用 --db 或 {DEFAULT_DB_ENV} 指定 SQLite 路徑")
         result = refresh_manifest(args.db, args.out, args.artifact)
+    elif args.command == "snapshot":
+        result = create_snapshot(args.db, args.out_dir, kind=args.kind, version=args.version)
+    elif args.command == "download":
+        if not args.db:
+            raise ValueError(f"請用 --db 或 {DEFAULT_DB_ENV} 指定 SQLite 路徑")
+        result = download_snapshot(args.db, kind="demo" if args.demo else args.kind,
+                                   source=args.source, force=args.force)
     elif args.command == "backfill":
         result = _backfill(RefreshService(DataStore(args.db)), args)
     else:
