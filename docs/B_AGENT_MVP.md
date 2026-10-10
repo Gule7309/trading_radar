@@ -208,7 +208,8 @@ A result cannot become `PUBLISHABLE` unless:
 4. core claims are not supported only by discovery snippets;
 5. at least one grounded risk exists;
 6. risks are not supported only by discovery snippets;
-7. no unresolved HIGH conflict remains.
+7. no unresolved HIGH conflict remains;
+8. every upstream `notice` / `disposition` risk flag is explicitly addressed by a grounded risk item.
 
 `don't know` / reject is a valid product result.
 
