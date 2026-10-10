@@ -1,6 +1,10 @@
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { URL } from "node:url";
 import { CandidatePacketSchema } from "../domain/candidate.js";
+import {
+  ScreeningOutputV1Schema,
+  screeningOutputToCandidatePackets,
+} from "../domain/screening-output.js";
 import type { CandidatePacket } from "../domain/candidate.js";
 import type { ResearchResult } from "../domain/research.js";
 import type { StoredResearchRun } from "../research/store.js";
@@ -159,6 +163,75 @@ export function createResearchApi(
             service: "trading-radar-b",
             thesisTracking: Boolean(theses),
             batchResearch: Boolean(batch),
+          },
+          corsOrigin,
+        );
+      }
+
+      if (
+        request.method === "POST" &&
+        url.pathname === "/api/research/screening-output"
+      ) {
+        if (!batch) {
+          return json(response, 501, { error: "BATCH_API_DISABLED" }, corsOrigin);
+        }
+
+        const body = await readJsonBody(request, maxBodyBytes);
+        if (typeof body !== "object" || body === null) {
+          return json(
+            response,
+            400,
+            { error: "INVALID_SCREENING_OUTPUT" },
+            corsOrigin,
+          );
+        }
+
+        const record = body as {
+          screeningOutput?: unknown;
+          options?: BatchResearchOptions;
+        };
+        const screeningInput =
+          "screeningOutput" in record ? record.screeningOutput : body;
+        const parsed = ScreeningOutputV1Schema.safeParse(screeningInput);
+
+        if (!parsed.success) {
+          return json(
+            response,
+            400,
+            {
+              error: "INVALID_SCREENING_OUTPUT",
+              issues: parsed.error.issues,
+            },
+            corsOrigin,
+          );
+        }
+
+        let candidates: CandidatePacket[];
+        try {
+          candidates = screeningOutputToCandidatePackets(parsed.data);
+        } catch (error) {
+          return json(
+            response,
+            400,
+            {
+              error: "SCREENING_ADAPTER_ERROR",
+              message:
+                error instanceof Error ? error.message : "Unknown adapter error",
+            },
+            corsOrigin,
+          );
+        }
+
+        const result = await batch.run(candidates, record.options);
+
+        return json(
+          response,
+          200,
+          {
+            screeningRunId: parsed.data.run.runId,
+            dataVersion: parsed.data.run.dataVersion,
+            sourceSnapshot: parsed.data.run.sourceSnapshot,
+            ...result,
           },
           corsOrigin,
         );
