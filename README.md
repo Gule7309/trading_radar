@@ -65,7 +65,13 @@ npm run demo:gemini:smoke
 npm run demo:gemini -- 2330 台積電 TWSE 半導體業
 ```
 
-### Local integration API
+### Frontend mock API (no model key)
+
+```bash
+npm run api:mock
+```
+
+### Local real integration API
 
 ```bash
 npm run api
@@ -75,6 +81,7 @@ Default: `http://127.0.0.1:8787`.
 
 Main B endpoints:
 
+- `POST /api/research/screening-output`
 - `POST /api/research/runs`
 - `POST /api/research/batch`
 - `GET /api/research/runs/:runId`
@@ -89,6 +96,7 @@ B docs:
 
 - `docs/B_AGENT_MVP.md` — architecture, policies, status, DoD
 - `docs/INTEGRATION.md` — A/B/C contracts and API usage
+- `docs/FRONTEND_HANDOFF.md` — when/how C can start, mock/live workflow
 
 ## A — Taiwan data layer
 
