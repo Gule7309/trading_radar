@@ -2,23 +2,23 @@
 
 ## A -> B
 
-B accepts a `CandidatePacket` from the quant/screener layer.
+B accepts `CandidatePacket` objects from A.
 
 Example:
 
 ```json
 {
-  "candidateId": "a-2330-2026-10-09",
+  "candidateId": "a-2330-2026-10-10",
   "ticker": "2330",
   "companyName": "台積電",
   "market": "TWSE",
   "industry": "半導體業",
-  "asOf": "2026-10-09",
+  "asOf": "2026-10-10",
   "quantScore": 0.91,
   "quantSignals": [
     {
       "metric": "revenue_yoy",
-      "value": 53.32,
+      "value": 0.5332,
       "period": "2026-08",
       "industryPercentile": 95
     }
@@ -27,87 +27,190 @@ Example:
 }
 ```
 
-Hard constraints must already be satisfied by A. B never auto-relaxes them.
+A owns hard constraints. B never auto-relaxes them.
 
-## B -> C
-
-Start the local B service:
+## Start B
 
 ```bash
+npm install
 npm run api
 ```
 
-Default address:
+Default:
 
 ```text
 http://127.0.0.1:8787
 ```
 
-### Health
+Environment:
 
-```http
-GET /health
+```env
+GEMINI_API_KEY=...
+LLM_PROVIDER=gemini
+SEARCH_PROVIDER=gemini-google-search
+PORT=8787
+CORS_ORIGIN=http://localhost:5173
+SQLITE_PATH=trading-radar.sqlite
 ```
 
-### Run research
+## Single candidate research
 
 ```http
 POST /api/research/runs
 Content-Type: application/json
 ```
 
-Body: `CandidatePacket`.
+Body = one `CandidatePacket`.
 
-The MVP endpoint is synchronous: it returns a completed `ResearchResult`.
-C should display a loading state while the run is executing.
+This MVP endpoint is synchronous. C should show a loading/researching state while it runs.
 
-### Read one stored run
+## Batch candidates -> Top 5
+
+```http
+POST /api/research/batch
+Content-Type: application/json
+```
+
+Example:
+
+```json
+{
+  "candidates": [],
+  "options": {
+    "topK": 5,
+    "researchLimit": 10,
+    "concurrency": 2,
+    "rankingWeights": {
+      "quant": 0.6,
+      "evidence": 0.4
+    }
+  }
+}
+```
+
+For a full A candidate pass, set `researchLimit` up to 30. The smaller default is a hackathon cost/latency tradeoff.
+
+## Research history
 
 ```http
 GET /api/research/runs/:runId
-```
-
-### Research history by ticker
-
-```http
 GET /api/research/tickers/:ticker/runs?limit=20
 ```
 
-## ResearchResult UI fields
+## Thesis creation
 
-Recommended C mapping:
+```http
+POST /api/theses
+Content-Type: application/json
+```
+
+```json
+{
+  "candidate": {},
+  "thesisId": "optional-client-id"
+}
+```
+
+A thesis is created only from a publishable research result.
+
+## Thesis recheck
+
+```http
+POST /api/theses/:thesisId/recheck
+Content-Type: application/json
+```
+
+```json
+{
+  "candidate": {},
+  "eventType": "MONTHLY_REVENUE"
+}
+```
+
+Supported event types:
+
+- `MONTHLY_REVENUE`
+- `MATERIAL_DISCLOSURE`
+- `NEWS`
+- `MANUAL_RECHECK`
+
+## Thesis history
+
+```http
+GET /api/theses/:thesisId
+GET /api/theses/:thesisId/versions
+GET /api/theses/:thesisId/events
+```
+
+## B -> C ResearchResult mapping
+
+Recommended C fields:
 
 - `status`: PUBLISHABLE / REJECTED / PARTIAL
 - `decision`: KEEP / REJECT
-- `thesis`: compiled thesis only when publishable
-- `keyReasons`: compact reason cards
-- `claims`: claim + verification state + source ids
-- `risks`: grounded risk cards
-- `invalidationConditions`: thesis monitoring conditions
-- `sources`: source drawer / citations
-- `verificationSummary`: evidence quality summary
-- `researchTrace`: optional expandable agent timeline
-- `metrics`: latency / token telemetry for development and evaluation
-- `stopReason`: explicit failure / rejection explanation
+- `thesis`
+- `keyReasons`
+- `claims[].status`
+- `claims[].category`
+- `claims[].importance`
+- `claims[].sourceIds`
+- `risks`
+- `invalidationConditions`
+- `sources`
+- `verificationSummary.coreClaimCoverage`
+- `verificationSummary.primarySourceRatio`
+- `verificationSummary.unresolvedConflicts`
+- `verificationSummary.freshness`
+- `researchTrace`
+- `stopReason`
 
-Do not display `metrics` as a stock confidence score.
+Development-only:
 
-## Provider strategy
+- `metrics.llmCalls`
+- `metrics.inputTokens`
+- `metrics.outputTokens`
+- `metrics.llmLatencyMs`
+- `metrics.totalLatencyMs`
+- `metrics.estimatedCostUsd`
 
-The runtime is provider-neutral:
+Do not render metrics or the internal ranking score as a probability that the stock will rise.
+
+## Source UI
+
+For each claim/risk, C can map `sourceIds` into `sources` and display:
+
+- title
+- publisher
+- source type
+- published date
+- data period
+- source tier
+- URL
+
+Tier-3 search snippets should not appear as verified evidence cards.
+
+## Trace UI
+
+`researchTrace` can power an expandable timeline such as:
 
 ```text
-LlmProvider -> Controller / Extractor / Verifier / Skeptic / Thesis
+1 Official revenue search
+2 Web discovery
+3 Fetch source
+4 Verify claims
+5 Skeptic (conditional)
+6 Publication gate
+```
+
+Do not display hidden chain-of-thought. Only structured action summaries/reason codes are stored.
+
+## Provider migration
+
+The provider boundary is:
+
+```text
+LlmProvider -> controller/extractor/verifier/skeptic/thesis
 SearchProvider -> discovery
 ```
 
-Current development configuration:
-
-```env
-LLM_PROVIDER=gemini
-SEARCH_PROVIDER=gemini-google-search
-```
-
-A later OpenAI migration should add an OpenAI `LlmProvider` adapter and change
-configuration, without modifying the harness, evidence ledger, publication gate,
-or A/B/C contracts.
+Gemini is the current development runtime. Later OpenAI migration should be an adapter/configuration change rather than a rewrite of A/B/C contracts.
