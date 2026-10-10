@@ -178,7 +178,7 @@ function computeVerificationSummary(state: ResearchState) {
     .map((source) =>
       assessSourceFreshness(source, state.candidate.asOf, 120),
     );
-  const freshness =
+  const freshness: "CURRENT" | "STALE" | "UNKNOWN" =
     freshnessChecks.some((item) => item.known && !item.fresh)
       ? "STALE"
       : freshnessChecks.some((item) => !item.known)
