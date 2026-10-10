@@ -13,7 +13,10 @@ import type {
   ToolObservation,
 } from "./tool-router.js";
 import type { ResearchAction } from "../domain/research.js";
-import { fetchExternalSource } from "./web/fetch-source.js";
+import {
+  fetchExternalSource,
+  UnsafeFetchTargetError,
+} from "./web/fetch-source.js";
 
 export type MonthlyRevenueFetcher = (
   market: TaiwanMarket,
@@ -162,6 +165,7 @@ export class DefaultToolRouter implements ResearchToolRouter {
 
           return {
             outcome: "ERROR",
+            retryable: false,
             summary:
               maybeNotFound.name === "OfficialDataNotFoundError"
                 ? `Official monthly revenue row not found for ${context.candidate.ticker}.`
@@ -203,6 +207,7 @@ export class DefaultToolRouter implements ResearchToolRouter {
         } catch (error) {
           return {
             outcome: "ERROR",
+            retryable: false,
             summary:
               error instanceof Error
                 ? error.message
@@ -254,6 +259,7 @@ export class DefaultToolRouter implements ResearchToolRouter {
       } catch (error) {
         return {
           outcome: "ERROR",
+          retryable: !(error instanceof UnsafeFetchTargetError),
           summary:
             error instanceof Error ? error.message : "Unknown source fetch error.",
         };
@@ -286,6 +292,7 @@ export class DefaultToolRouter implements ResearchToolRouter {
       } catch (error) {
         return {
           outcome: "ERROR",
+          retryable: true,
           summary:
             error instanceof Error ? error.message : "Unknown news search error.",
         };
