@@ -116,6 +116,17 @@ export function recheckThesis(
     throw new Error("Cannot recheck a thesis with a different ticker.");
   }
 
+  if (result.status !== "PUBLISHABLE") {
+    return {
+      ...previous,
+      version: previous.version + 1,
+      status: "UNCHANGED",
+      createdAt: result.completedAt,
+      changeReason:
+        `Research recheck ended with ${result.stopReason}; no verified evidence was allowed to change the thesis.`,
+    };
+  }
+
   const claims = resultClaims(result, previous);
   const { coreClaims, supportingClaims } = partitionClaims(claims);
   const change = deriveStatus(previous, claims);
