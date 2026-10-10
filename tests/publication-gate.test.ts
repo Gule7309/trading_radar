@@ -136,6 +136,20 @@ describe("evaluatePublicationGate", () => {
     });
   });
 
+  it("requires every upstream risk flag to be explicitly addressed by grounded risk evidence", () => {
+    const state = baseState();
+    state.candidate.riskFlags = ["notice"];
+
+    expect(evaluatePublicationGate(state)).toEqual({
+      ok: false,
+      reason: "UPSTREAM_RISK_FLAG_UNADDRESSED",
+    });
+
+    state.risks[0]!.addressesRiskFlags = ["notice"];
+
+    expect(evaluatePublicationGate(state)).toEqual({ ok: true });
+  });
+
   it("rejects unresolved high-severity conflicts", () => {
     const state = baseState();
     state.conflicts.push({
