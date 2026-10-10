@@ -33,6 +33,21 @@ const METRICS: Record<string, MetricMapping> = {
     label: "cumulative revenue YoY",
     unit: "%",
   },
+  operating_margin: {
+    metadataKey: "operatingMarginPercent",
+    label: "operating margin",
+    unit: "%",
+  },
+  debt_ratio: {
+    metadataKey: "debtRatioPercent",
+    label: "debt ratio",
+    unit: "%",
+  },
+  avg_turnover_20d: {
+    metadataKey: "avgTurnover20dTwd",
+    label: "20-day average turnover",
+    unit: " TWD",
+  },
 };
 
 function id(prefix: string, value: string): string {
