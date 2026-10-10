@@ -31,6 +31,22 @@ function htmlToPlainText(html: string): string {
     .trim();
 }
 
+export function detectInstructionLikeText(text: string): boolean {
+  const normalized = text.toLowerCase();
+
+  return [
+    "ignore previous instructions",
+    "ignore all previous instructions",
+    "system prompt",
+    "developer message",
+    "reveal your prompt",
+    "do not follow your instructions",
+    "you are chatgpt",
+    "assistant must",
+    "tool call",
+  ].some((pattern) => normalized.includes(pattern));
+}
+
 function extractTitle(html: string): string | undefined {
   const match = html.match(/<title[^>]*>([\s\S]*?)<\/title>/i);
   return match ? htmlToPlainText(match[1] ?? "") : undefined;
@@ -142,6 +158,7 @@ export async function fetchExternalSource(
       metadata: {
         contentType,
         truncated: raw.length > maxBytes,
+        instructionLikeTextDetected: detectInstructionLikeText(text),
       },
       untrustedContent: true,
     };
