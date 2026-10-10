@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import date
 from typing import Iterable
 
 from ..db import now_iso
@@ -104,7 +105,10 @@ def merge_financials(
             "eps": clamp_ratio(eps), "roe": clamp_ratio(roe), "roa": clamp_ratio(roa),
             "gross_margin": clamp_ratio(gross_margin),
             "operating_margin": clamp_ratio(operating_margin),
-            "debt_ratio": clamp_ratio(debt_ratio), "market": market, "fetched_at": fetched_at,
+            "debt_ratio": clamp_ratio(debt_ratio),
+            "available_date": financial_available_date(year, quarter),
+            "statement_type": "general", "source_kind": "openapi_latest",
+            "market": market, "fetched_at": fetched_at,
         })
     return result
 
@@ -125,3 +129,14 @@ def _period(row: dict) -> tuple[int, int] | None:
     if quarter not in (1, 2, 3, 4):
         return None
     return year, quarter
+
+
+def financial_available_date(year: int, quarter: int) -> date:
+    """Conservative all-industry availability date used to prevent look-ahead."""
+    if quarter == 1:
+        return date(year, 5, 31)
+    if quarter == 2:
+        return date(year, 8, 31)
+    if quarter == 3:
+        return date(year, 11, 30)
+    return date(year + 1, 3, 31)

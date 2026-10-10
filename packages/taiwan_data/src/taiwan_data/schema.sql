@@ -106,6 +106,18 @@ CREATE TABLE IF NOT EXISTS quarterly_financials (
     gross_margin REAL,
     operating_margin REAL,
     debt_ratio REAL,
+    revenue_quarter INTEGER,
+    gross_profit_quarter INTEGER,
+    operating_income_quarter INTEGER,
+    net_income_quarter INTEGER,
+    eps_quarter REAL,
+    gross_margin_quarter REAL,
+    operating_margin_quarter REAL,
+    roe_quarter REAL,
+    roa_quarter REAL,
+    available_date TEXT,
+    statement_type TEXT,
+    source_kind TEXT,
     market TEXT,
     fetched_at TEXT NOT NULL,
     PRIMARY KEY (stock_id, year, quarter)
@@ -181,6 +193,19 @@ CREATE TABLE IF NOT EXISTS dataset_status (
     error TEXT
 );
 
+CREATE TABLE IF NOT EXISTS backfill_checkpoints (
+    dataset TEXT NOT NULL,
+    unit_key TEXT NOT NULL,
+    status TEXT NOT NULL,
+    row_count INTEGER NOT NULL DEFAULT 0,
+    error TEXT,
+    updated_at TEXT NOT NULL,
+    PRIMARY KEY (dataset, unit_key)
+);
+
+CREATE INDEX IF NOT EXISTS idx_backfill_checkpoints_status
+    ON backfill_checkpoints (dataset, status);
+
 INSERT INTO schema_meta (key, value)
-VALUES ('schema_version', '1')
+VALUES ('schema_version', '2')
 ON CONFLICT(key) DO UPDATE SET value=excluded.value, updated_at=CURRENT_TIMESTAMP;

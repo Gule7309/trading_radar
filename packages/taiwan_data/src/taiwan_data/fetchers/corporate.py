@@ -7,11 +7,12 @@ from .common import clean_num, get_json, is_stock_code, parse_roc_date
 URL_TWSE_DIVIDEND = "https://www.twse.com.tw/rwd/zh/exRight/TWT49U"
 URL_TPEX_DIVIDEND = "https://www.tpex.org.tw/www/zh-tw/bulletin/exDailyQ"
 URL_TWSE_DELISTED = "https://openapi.twse.com.tw/v1/company/suspendListingCsvAndHtml"
+URL_TPEX_DELISTED = "https://www.tpex.org.tw/www/zh-tw/company/deListed"
 URL_TWSE_COMPANY = "https://openapi.twse.com.tw/v1/opendata/t187ap03_L"
 URL_TPEX_COMPANY = "https://www.tpex.org.tw/openapi/v1/mopsfin_t187ap03_O"
 
 DIVIDEND_SOURCES = f"{URL_TWSE_DIVIDEND};{URL_TPEX_DIVIDEND}"
-DELISTED_SOURCES = URL_TWSE_DELISTED
+DELISTED_SOURCES = f"{URL_TWSE_DELISTED};{URL_TPEX_DELISTED}"
 COMPANY_SOURCES = f"{URL_TWSE_COMPANY};{URL_TPEX_COMPANY}"
 
 # 官方「產業別」代碼。名稱沿用舊 snapshot（FinMind）同代碼股票的多數標籤，
@@ -86,6 +87,41 @@ def fetch_twse_delisted(session=None) -> list[dict]:
             "market": "TWSE",
         })
     return rows
+
+
+def fetch_tpex_delisted(years: range | list[int] | tuple[int, ...] | None = None,
+                        session=None) -> list[dict]:
+    years = years or [date.today().year]
+    rows: dict[tuple[str, date], dict] = {}
+    for year in years:
+        payload = get_json(
+            URL_TPEX_DELISTED,
+            params={"date": str(year), "reason": "-1", "code": ""},
+            session=session,
+        )
+        tables = payload.get("tables") or []
+        if str(payload.get("stat", "")).lower() != "ok" or not tables:
+            raise RuntimeError(f"TPEX 終止上櫃查詢失敗（{year}）：{payload.get('stat')}")
+        for raw in tables[0].get("data") or []:
+            if len(raw) < 3:
+                continue
+            stock_id = str(raw[0]).strip()
+            delisting_date = parse_roc_date(raw[2])
+            if not is_stock_code(stock_id) or delisting_date is None:
+                continue
+            rows[(stock_id, delisting_date)] = {
+                "stock_id": stock_id,
+                "stock_name": str(raw[1]).strip() or None,
+                "delisting_date": delisting_date,
+                "market": "TPEX",
+            }
+    # Schema keeps the latest delisting for a reused code, matching the existing TWSE source.
+    latest: dict[str, dict] = {}
+    for row in rows.values():
+        previous = latest.get(row["stock_id"])
+        if previous is None or row["delisting_date"] > previous["delisting_date"]:
+            latest[row["stock_id"]] = row
+    return list(latest.values())
 
 
 def fetch_company_profiles(session=None) -> list[dict]:
