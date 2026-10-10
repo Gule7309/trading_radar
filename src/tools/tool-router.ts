@@ -16,6 +16,7 @@ export interface ToolObservation {
   summary: string;
   failureCode?: string;
   retryable?: boolean;
+  attempts?: number;
   sources?: SourceDocument[];
   knownFacts?: KnownFact[];
   risks?: RiskItem[];
