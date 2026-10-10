@@ -1,4 +1,4 @@
-import type { CandidatePacket } from "./candidate.js";
+import type { CandidatePacket, RiskFlag } from "./candidate.js";
 
 export type ResearchPhase =
   | "DISCOVERY"
@@ -88,6 +88,7 @@ export interface RiskItem {
   title: string;
   explanation: string;
   sourceIds: string[];
+  addressesRiskFlags?: RiskFlag[];
 }
 
 export interface ConflictItem {
@@ -206,6 +207,7 @@ export interface ResearchResult {
     title: string;
     explanation: string;
     sourceIds: string[];
+    addressesRiskFlags?: RiskFlag[];
   }>;
   invalidationConditions: string[];
   sources: Array<{
