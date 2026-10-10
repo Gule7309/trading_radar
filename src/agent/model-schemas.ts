@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { RiskFlagSchema } from "../domain/candidate.js";
 
 export const ClaimCategorySchema = z.enum([
   "FINANCIAL",
@@ -36,6 +37,7 @@ export const RiskExtractionOutputSchema = z.object({
         title: z.string().min(1),
         explanation: z.string().min(1),
         sourceIds: z.array(z.string().min(1)).min(1).max(3),
+        addressesRiskFlags: z.array(RiskFlagSchema).max(2).optional(),
       }),
     )
     .max(6),
