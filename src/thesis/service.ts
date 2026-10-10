@@ -27,6 +27,18 @@ export class ThesisService {
     return version;
   }
 
+  async getLatest(thesisId: string) {
+    return this.store.getLatest(thesisId);
+  }
+
+  async listVersions(thesisId: string) {
+    return this.store.listVersions(thesisId);
+  }
+
+  async listEvents(thesisId: string) {
+    return this.store.listEvents(thesisId);
+  }
+
   async recheckFromResearch(
     thesisId: string,
     result: ResearchResult,
