@@ -14,7 +14,7 @@ permissions:
   contents: read
 
 jobs:
-  validate:
+  node:
     runs-on: ubuntu-latest
     timeout-minutes: 10
 
@@ -22,7 +22,6 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      # Node 專案尚未建立；有 package.json 後才執行，避免空 repo 的 CI 永遠失敗。
       - name: Setup Node
         if: hashFiles('package.json') != ''
         uses: actions/setup-node@v4
@@ -40,6 +39,10 @@ jobs:
       - name: Test
         if: hashFiles('package.json') != ''
         run: npm test
+
+      - name: Offline MVP eval
+        if: hashFiles('package.json') != ''
+        run: npm run eval:offline
 
   taiwan-data:
     runs-on: ubuntu-latest
