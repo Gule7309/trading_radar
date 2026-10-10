@@ -8,10 +8,11 @@ from datetime import date
 
 from .bootstrap import build_snapshot, refresh_manifest
 from .db import DEFAULT_DB_ENV, DataStore
-from .service import RefreshService
+from .service import BACKFILL_START, RefreshService
 
 REFRESH_TARGETS = ("all", "market", "stocks", "revenue", "financials", "margin",
                    "dividends", "disposition", "delisted", "industries")
+BACKFILL_TARGETS = ("all", "financials", "disposition", "margin", "institutional", "delisted")
 
 
 def _date(value: str) -> date:
@@ -39,6 +40,16 @@ def build_parser() -> argparse.ArgumentParser:
     refresh.add_argument("--delay", type=float, default=0.8)
     refresh.add_argument("--lookback-days", type=int, default=0,
                          help="market／margin 額外重抓最近 N 天，補回暫時性失敗的缺口")
+
+    backfill = sub.add_parser("backfill", help="從官方來源回補歷史缺口，可依 checkpoint 續跑")
+    backfill.add_argument("target", choices=BACKFILL_TARGETS)
+    backfill.add_argument("--db", default=os.getenv(DEFAULT_DB_ENV))
+    backfill.add_argument("--since", type=_date, default=BACKFILL_START)
+    backfill.add_argument("--until", type=_date)
+    backfill.add_argument("--delay", type=float, default=0.2,
+                          help="每次官方請求間隔秒數")
+    backfill.add_argument("--market", choices=("TWSE", "TPEX"),
+                          help="margin／institutional 可只回補單一市場")
 
     status = sub.add_parser("status", help="顯示各資料表筆數與日期範圍")
     status.add_argument("--db", default=os.getenv(DEFAULT_DB_ENV))
@@ -68,6 +79,8 @@ def main(argv: list[str] | None = None) -> None:
         if not args.db:
             raise ValueError(f"請用 --db 或 {DEFAULT_DB_ENV} 指定 SQLite 路徑")
         result = refresh_manifest(args.db, args.out, args.artifact)
+    elif args.command == "backfill":
+        result = _backfill(RefreshService(DataStore(args.db)), args)
     else:
         result = _refresh(RefreshService(DataStore(args.db)), args)
     print(json.dumps(result, ensure_ascii=False, indent=2, default=str))
@@ -103,6 +116,23 @@ def _refresh(service: RefreshService, args: argparse.Namespace) -> dict[str, obj
     if args.target == "industries":
         return service.refresh_industries()
     return service.refresh_stocks_and_latest_prices()
+
+
+def _backfill(service: RefreshService, args: argparse.Namespace) -> dict[str, object]:
+    window = {"since": args.since, "until": args.until, "delay": args.delay}
+    if args.market and args.target not in {"margin", "institutional"}:
+        raise ValueError("--market 只適用於 margin／institutional")
+    if args.target == "all":
+        return service.backfill_all(**window)
+    if args.target == "financials":
+        return service.backfill_financials(**window)
+    if args.target == "disposition":
+        return service.backfill_disposition(**window)
+    if args.target == "margin":
+        return service.backfill_margin(**window, market=args.market)
+    if args.target == "institutional":
+        return service.backfill_institutional(**window, market=args.market)
+    return service.backfill_delisted(until=args.until, delay=args.delay)
 
 
 def _print_status(result: dict[str, object]) -> None:

@@ -40,14 +40,28 @@ $env:TAIWAN_DATA_DB = "$PWD\var\data\taiwan_stock.sqlite"
 | `market` | `daily_prices`、`institutional_trading` | TWSE MI_INDEX／T86、TPEX dailyQuotes／insti | 從最後交易日續抓；`--lookback-days` 重抓近 N 天 |
 | `stocks` | `stocks`、當日 `daily_prices` | TWSE／TPEX OpenAPI 當日行情 | 每次全量 upsert |
 | `revenue` | `monthly_revenue` | MOPS 月營收彙總（每月 10 日後公布上月） | 從最後月份續抓，並重抓最新月 |
-| `financials` | `quarterly_financials` | TWSE／TPEX OpenAPI（只有最新一季、一般業） | 每次覆寫最新季 |
+| `financials` | `quarterly_financials` | TWSE／TPEX OpenAPI（最新一季、一般業） | 每次覆寫最新季並重算單季值 |
 | `margin` | `margin_trading` | TWSE MI_MARGN、TPEX margin/balance | 同 `market` |
 | `dividends` | `dividend_events` | TWSE TWT49U、TPEX exDailyQ | 從最後除權息日往回 14 天重抓 |
 | `disposition` | `disposition_events`、`notice_events` | TWSE punish／notice、TPEX disposal／attention | 從最後公告日往回 14 天重抓 |
-| `delisted` | `delisted_stocks`、`stocks.is_active` | TWSE OpenAPI 終止上市 | 全量；下市日後仍有成交的代號不標下市 |
+| `delisted` | `delisted_stocks`、`stocks.is_active` | TWSE OpenAPI、TPEX 終止上櫃查詢 | TWSE 全量＋TPEX 當年度；下市日後仍有成交的代號不標下市 |
 | `industries` | `industries`、`stock_industry_map`、`stocks` | TWSE／TPEX OpenAPI 公司基本資料 | **只補空值**，不覆寫舊 snapshot 的分類 |
 
 所有寫入都是 primary key upsert，重跑不會產生重複。
+
+### 歷史回補
+
+`taiwan-data backfill TARGET --since 2015-01-01` 用正式來源補歷史缺口。每個季度、市場日、月份或
+年度都會寫入 `backfill_checkpoints`；成功單位重跑時自動跳過，失敗單位可直接續跑。
+逐日資料可加 `--market TWSE` 或 `--market TPEX`，讓兩個官方網域分流回補。
+
+| target | 單位 | 補入內容 |
+|---|---|---|
+| `financials` | 季度 × 市場 | MOPS 損益表與資產負債表、累計轉單季、point-in-time 可用日 |
+| `disposition` | 月 | 兩市場處置股與注意股，整月原子取代以反映更正／撤回 |
+| `margin` | 交易日 × 市場 | 只抓資料庫中該市場整日缺失的日期 |
+| `institutional` | 交易日 × 市場 | 只抓買進／賣出明細仍為 NULL 的日期，支援 2015 舊欄位 |
+| `delisted` | TWSE 全量、TPEX 年度 | 上市下市與上櫃終止上櫃公司 |
 
 ## 每日排程（本機）
 
@@ -68,16 +82,15 @@ powershell -ExecutionPolicy Bypass -File scripts\windows\register_daily_task.ps1
 
 ## 資料語意與已知限制
 
-- **`quarterly_financials` 的損益欄位是「年初至今累計」**：官方 OpenAPI 的 Q2 營收、淨利、EPS
-  是上半年合計（已用 2330／1101／2317 對照 1–6 月營收加總驗證），ROE／ROA 也因此是累計值，
-  不是單季、也未年化。資產負債欄位是季底時點值。
-- `quarterly_financials` 只有 2026Q2 起逐季累積；歷史季報回補評估見
-  [backfill-evaluation.md](backfill-evaluation.md)。
-- `institutional_trading` 2026-07 以前的列只有買賣超淨額，買進／賣出明細為 NULL。
-- `margin_trading`：上市自 2016-07；**上櫃自 2026-07-23 才有**（舊專案只抓上市）。
-  舊資料含 10 檔 91xxxx 存託憑證到 2026-07-22 為止；之後與其他資料表一致，只收 4 碼代號。
-- `disposition_events`／`notice_events`：上市自 2015；**上櫃自 2026-07 起**。
-- `delisted_stocks` 只有上市；上櫃目前沒有已知的官方下市清單端點，回測仍有上櫃倖存者偏誤。
+- **`quarterly_financials` 原欄位仍是「年初至今累計」**；`*_quarter` 才是真單季值。
+  Q1 直接取累計值，Q2–Q4 只有在同年上一季存在時才相減，缺季不硬算。資產負債欄位是季底時點值。
+- `available_date` 採所有產業都安全的保守日期（5/31、8/31、11/30、次年 3/31），回測必須以它
+  限制可見資料；`statement_type` 區分一般業、銀行、金控、證券等格式。
+- 特殊產業不具一般業可比性的營收／毛利欄位保留 NULL；淨利、EPS、資產、負債、權益照官方欄位保留。
+- 融資券與法人買賣明細屬逐日大量回補；以 `backfill_checkpoints` 與 `status --json` 確認完成度，
+  不可只看資料表最大日期。
+- TPEX 終止上櫃 API 可查早期年度，已納入歷史回補；`delisted_stocks` 仍沿用每個代號一列的 schema，
+  同一代號重複終止掛牌時保留較晚日期。
 - 產業分類以舊 snapshot（FinMind 名稱）為主，官方公司基本資料只補缺漏；同一檔可能有多個分類
   （例如「半導體業」與舊的「電子工業」）。
 - 行情／融資融券只要某市場某日抓取失敗，該日會記為 `partial`；排程的 `--lookback-days 5`

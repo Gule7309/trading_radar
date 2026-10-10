@@ -5,7 +5,7 @@ import os
 import re
 import sqlite3
 from contextlib import closing, contextmanager
-from datetime import datetime
+from datetime import date, datetime
 from importlib.resources import files
 from pathlib import Path
 from typing import Iterable, Iterator, Mapping, Sequence
@@ -48,6 +48,20 @@ class DataStore:
                 "invest_buy": "INTEGER", "invest_sell": "INTEGER",
                 "dealer_buy": "INTEGER", "dealer_sell": "INTEGER",
                 "dealer_net": "INTEGER",
+            })
+            self._ensure_columns(conn, "quarterly_financials", {
+                "revenue_quarter": "INTEGER",
+                "gross_profit_quarter": "INTEGER",
+                "operating_income_quarter": "INTEGER",
+                "net_income_quarter": "INTEGER",
+                "eps_quarter": "REAL",
+                "gross_margin_quarter": "REAL",
+                "operating_margin_quarter": "REAL",
+                "roe_quarter": "REAL",
+                "roa_quarter": "REAL",
+                "available_date": "TEXT",
+                "statement_type": "TEXT",
+                "source_kind": "TEXT",
             })
             conn.commit()
 
@@ -109,14 +123,17 @@ class DataStore:
                             source: str) -> dict[str, int]:
         """只補空值：既有（舊 snapshot）的產業分類、上市日期與市場不覆寫。"""
         rows = [
-            (str(p["stock_id"]), p.get("industry_name"), _sqlite_value(p.get("listing_date")),
-             p.get("market"))
+            (
+                str(p["stock_id"]), p.get("stock_name"), p.get("industry_name"),
+                _sqlite_value(p.get("listing_date")), p.get("market"),
+            )
             for p in profiles
         ]
         with closing(self.connect()) as conn:
             conn.execute("CREATE TEMP TABLE profile_import "
-                         "(stock_id TEXT PRIMARY KEY, industry TEXT, listing_date TEXT, market TEXT)")
-            conn.executemany("INSERT OR REPLACE INTO profile_import VALUES (?, ?, ?, ?)", rows)
+                         "(stock_id TEXT PRIMARY KEY, stock_name TEXT, industry TEXT, "
+                         "listing_date TEXT, market TEXT)")
+            conn.executemany("INSERT OR REPLACE INTO profile_import VALUES (?, ?, ?, ?, ?)", rows)
             counts = {}
             conn.execute(
                 "INSERT OR IGNORE INTO industries (industry_code, name_zh, source) "
@@ -133,10 +150,12 @@ class DataStore:
             counts["stock_industry_map"] = conn.execute("SELECT changes()").fetchone()[0]
             cursor = conn.execute(
                 "UPDATE stocks SET "
+                "stock_name=COALESCE(stocks.stock_name, p.stock_name), "
                 "industry_code=COALESCE(stocks.industry_code, p.industry), "
                 "listing_date=COALESCE(stocks.listing_date, p.listing_date), "
                 "market=COALESCE(stocks.market, p.market), updated_at=CURRENT_TIMESTAMP "
                 "FROM profile_import p WHERE p.stock_id=stocks.stock_id AND ("
+                "(stocks.stock_name IS NULL AND p.stock_name IS NOT NULL) OR "
                 "(stocks.industry_code IS NULL AND p.industry IS NOT NULL) OR "
                 "(stocks.listing_date IS NULL AND p.listing_date IS NOT NULL) OR "
                 "(stocks.market IS NULL AND p.market IS NOT NULL))"
@@ -279,6 +298,125 @@ class DataStore:
             conn.commit()
         return {"deleted": deleted, "inserted": len(materialized)}
 
+    def successful_checkpoints(self, dataset: str) -> set[str]:
+        with closing(self.connect()) as conn:
+            return {
+                str(row[0]) for row in conn.execute(
+                    "SELECT unit_key FROM backfill_checkpoints "
+                    "WHERE dataset=? AND status='success'",
+                    (dataset,),
+                )
+            }
+
+    def set_checkpoint(
+        self, dataset: str, unit_key: str, status: str, *, row_count: int = 0,
+        error: str | None = None,
+    ) -> None:
+        if status not in {"success", "failed"}:
+            raise ValueError(f"不合法的 checkpoint 狀態：{status}")
+        with closing(self.connect()) as conn:
+            conn.execute(
+                "INSERT INTO backfill_checkpoints "
+                "(dataset, unit_key, status, row_count, error, updated_at) "
+                "VALUES (?, ?, ?, ?, ?, ?) "
+                "ON CONFLICT(dataset, unit_key) DO UPDATE SET "
+                "status=excluded.status, row_count=excluded.row_count, "
+                "error=excluded.error, updated_at=excluded.updated_at",
+                (dataset, unit_key, status, row_count, error, now_iso()),
+            )
+            conn.commit()
+
+    def trading_dates(self, since: date, until: date) -> list[date]:
+        with closing(self.connect()) as conn:
+            rows = conn.execute(
+                "SELECT DISTINCT trade_date FROM daily_prices "
+                "WHERE trade_date BETWEEN ? AND ? ORDER BY trade_date",
+                (since.isoformat(), until.isoformat()),
+            ).fetchall()
+        return [date.fromisoformat(str(row[0])) for row in rows]
+
+    def market_backfill_dates(
+        self, table: str, market: str, since: date, until: date,
+        *, detail_columns: Sequence[str] = (),
+    ) -> list[date]:
+        """Trading dates where a market is absent or still has NULL detail fields."""
+        self._check_identifier(table)
+        for column in detail_columns:
+            self._check_identifier(column)
+        detail_expression = "0"
+        if detail_columns:
+            conditions = " OR ".join(f"t.[{column}] IS NULL" for column in detail_columns)
+            detail_expression = f"MAX(CASE WHEN {conditions} THEN 1 ELSE 0 END)"
+        sql = (
+            "WITH market_dates AS ("
+            "SELECT DISTINCT p.trade_date FROM daily_prices p "
+            "JOIN stocks ps ON ps.stock_id=p.stock_id "
+            "WHERE p.trade_date BETWEEN ? AND ? AND ps.market=?), "
+            "existing AS ("
+            "SELECT t.trade_date, COUNT(*) AS rows, " + detail_expression + " AS has_null "
+            "FROM [" + table + "] t JOIN stocks ts ON ts.stock_id=t.stock_id "
+            "WHERE t.trade_date BETWEEN ? AND ? AND ts.market=? GROUP BY t.trade_date) "
+            "SELECT d.trade_date FROM market_dates d LEFT JOIN existing e USING(trade_date) "
+            "WHERE e.rows IS NULL OR e.has_null=1 ORDER BY d.trade_date"
+        )
+        params: list[object] = [
+            since.isoformat(), until.isoformat(), market,
+            since.isoformat(), until.isoformat(), market,
+        ]
+        with closing(self.connect()) as conn:
+            rows = conn.execute(sql, params).fetchall()
+        return [date.fromisoformat(str(row[0])) for row in rows]
+
+    def recompute_financial_quarters(self) -> int:
+        """Derive true single-quarter values without changing cumulative source fields."""
+        with closing(self.connect()) as conn:
+            rows = conn.execute(
+                "SELECT stock_id, year, quarter, revenue, gross_profit, "
+                "operating_income, net_income, eps, total_assets, equity, available_date "
+                "FROM quarterly_financials ORDER BY stock_id, year, quarter"
+            ).fetchall()
+            by_period = {
+                (str(row["stock_id"]), int(row["year"]), int(row["quarter"])): row
+                for row in rows
+            }
+            updates = []
+            for row in rows:
+                stock_id = str(row["stock_id"])
+                year = int(row["year"])
+                quarter = int(row["quarter"])
+                previous = by_period.get((stock_id, year, quarter - 1))
+
+                values = []
+                for column in ("revenue", "gross_profit", "operating_income", "net_income", "eps"):
+                    current_value = row[column]
+                    if quarter == 1:
+                        values.append(current_value)
+                    elif previous is not None and current_value is not None and previous[column] is not None:
+                        values.append(current_value - previous[column])
+                    else:
+                        values.append(None)
+                revenue, gross_profit, operating_income, net_income, eps = values
+                gross_margin = _ratio(gross_profit, revenue)
+                operating_margin = _ratio(operating_income, revenue)
+                roe = _ratio(net_income, row["equity"])
+                roa = _ratio(net_income, row["total_assets"])
+                available = row["available_date"] or _financial_available_date(year, quarter)
+                updates.append((
+                    revenue, gross_profit, operating_income, net_income, eps,
+                    gross_margin, operating_margin, roe, roa, available,
+                    stock_id, year, quarter,
+                ))
+            conn.executemany(
+                "UPDATE quarterly_financials SET "
+                "revenue_quarter=?, gross_profit_quarter=?, operating_income_quarter=?, "
+                "net_income_quarter=?, eps_quarter=?, gross_margin_quarter=?, "
+                "operating_margin_quarter=?, roe_quarter=?, roa_quarter=?, available_date=? "
+                "WHERE stock_id=? AND year=? AND quarter=?",
+                updates,
+            )
+            conn.commit()
+        return len(updates)
+
     @contextmanager
     def ingest(self, dataset: str, source: str) -> Iterator[dict[str, object]]:
         started = now_iso()
@@ -350,6 +488,7 @@ class DataStore:
             "delisted_stocks": ("delisting_date", "stock_id"),
             "industries": (None, None),
             "stock_industry_map": (None, None),
+            "backfill_checkpoints": (None, None),
         }
         result: dict[str, object] = {"database": str(self.path), "tables": {}}
         with closing(self.connect()) as conn:
@@ -380,6 +519,12 @@ class DataStore:
                 "FROM dataset_status ORDER BY dataset"
             ).fetchall() if "dataset_status" in existing else []
             result["dataset_status"] = [dict(r) for r in statuses]
+            checkpoints = conn.execute(
+                "SELECT dataset, status, COUNT(*) AS units, SUM(row_count) AS rows, "
+                "MAX(updated_at) AS updated_at FROM backfill_checkpoints "
+                "GROUP BY dataset, status ORDER BY dataset, status"
+            ).fetchall() if "backfill_checkpoints" in existing else []
+            result["backfill_status"] = [dict(r) for r in checkpoints]
         return result
 
     @staticmethod
@@ -407,3 +552,21 @@ def _sqlite_value(value):
     if isinstance(value, (dict, list, tuple)):
         return json.dumps(value, ensure_ascii=False, sort_keys=True)
     return value
+
+
+def _ratio(numerator, denominator) -> float | None:
+    if numerator is None or denominator in (None, 0):
+        return None
+    value = float(numerator) / float(denominator) * 100
+    return value if abs(value) < 9999 else None
+
+
+def _financial_available_date(year: int, quarter: int) -> str:
+    # A conservative all-industry point-in-time date; later than the normal filing deadline.
+    if quarter == 1:
+        return date(year, 5, 31).isoformat()
+    if quarter == 2:
+        return date(year, 8, 31).isoformat()
+    if quarter == 3:
+        return date(year, 11, 30).isoformat()
+    return date(year + 1, 3, 31).isoformat()

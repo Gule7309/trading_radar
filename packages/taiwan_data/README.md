@@ -8,16 +8,17 @@
 - 日價量 OHLCV 與成交金額
 - 三大法人
 - 月營收、MoM、YoY
-- 最新一般業季財報（損益欄位為年初至今累計），以及啟用後逐季累積
+- 2015 起上市櫃季財報（原始累計值＋推導單季值，含保守可用日與報表類型）
 - 融資融券（上市＋上櫃）
 - 除權息事件（上市＋上櫃）
 - 處置股、注意股（上市＋上櫃）
-- 上市下市清單
+- 上市下市與上櫃終止上櫃清單
 - 產業對照、上市櫃日期（官方公司基本資料補缺漏）
 - 每次抓取的狀態、資料日期、來源與錯誤紀錄
 
-財報官方 OpenAPI 只能取得當期最新一季；本套件不宣稱具備十年歷史季報。金融、保險、證券的特殊格式也不在目前財報抓取範圍。
-各資料集的來源、增量方式與已知缺口見 repo 的 `docs/data/README.md`。
+日常更新使用官方 OpenAPI；歷史季報由 MOPS 彙總報表回補。金融、保險、證券等特殊格式會保留
+可比較的淨利、EPS 與資產負債欄位，不把產業專屬收入硬套成一般業營收。
+各資料集的來源、資料契約與 checkpoint 規則見 repo 的 `docs/data/README.md`。
 
 ## 在本 repo 建立 snapshot
 
@@ -71,6 +72,13 @@ taiwan-data refresh dividends --db PATH
 taiwan-data refresh disposition --db PATH
 taiwan-data refresh delisted --db PATH
 taiwan-data refresh industries --db PATH
+taiwan-data backfill all --db PATH --since 2015-01-01
+taiwan-data backfill financials --db PATH --since 2015-01-01
+taiwan-data backfill disposition --db PATH --since 2015-01-01
+taiwan-data backfill margin --db PATH --since 2015-01-01
+taiwan-data backfill institutional --db PATH --since 2015-01-01
+taiwan-data backfill institutional --db PATH --market TPEX --since 2015-01-01
+taiwan-data backfill delisted --db PATH
 taiwan-data status --db PATH --json
 taiwan-data manifest --db PATH --artifact dist/taiwan_stock_data-0.1.0-py3-none-any.whl
 ```

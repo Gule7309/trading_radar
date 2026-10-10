@@ -16,9 +16,13 @@ def clean_num(value) -> float | None:
     text = str(value).strip().replace(",", "").replace(" ", "")
     if text in ("", "-", "--", "---", "X", "x", "N/A", "不適用"):
         return None
+    negative = text.startswith("(") and text.endswith(")")
+    if negative:
+        text = text[1:-1]
     text = text.lstrip("X").replace("+", "")
     try:
-        return float(text)
+        number = float(text)
+        return -number if negative else number
     except ValueError:
         return None
 
@@ -38,7 +42,7 @@ def roc_to_date(value) -> date | None:
         return None
 
 
-_ROC_TEXT_DATE = re.compile(r"^\*?\s*(\d{2,3})\s*[/.年]\s*(\d{1,2})\s*[/.月]\s*(\d{1,2})\s*日?\s*$")
+_ROC_TEXT_DATE = re.compile(r"^\*?\s*(\d{2,3})\s*[-/.年]\s*(\d{1,2})\s*[-/.月]\s*(\d{1,2})\s*日?\s*$")
 
 
 def parse_roc_date(value) -> date | None:

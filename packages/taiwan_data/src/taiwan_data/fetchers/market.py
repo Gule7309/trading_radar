@@ -158,20 +158,38 @@ def fetch_twse_institutional(trade_date: date, session=None) -> list[dict]:
 
     fields = payload["fields"]
 
-    def column(*keywords):
-        return next((i for i, name in enumerate(fields)
-                     if all(keyword in name for keyword in keywords)), None)
+    def column(predicate):
+        return next((i for i, name in enumerate(fields) if predicate(str(name))), None)
+
+    def foreign(action: str):
+        return column(lambda name: action in name and (
+            (name.startswith("外陸資") and "不含外資自營商" in name)
+            or (name.startswith("外資") and "外資自營商" not in name)
+        ))
 
     positions = {
-        "foreign_buy": column("外陸資買進", "不含外資自營商"),
-        "foreign_sell": column("外陸資賣出", "不含外資自營商"),
-        "invest_buy": column("投信買進"), "invest_sell": column("投信賣出"),
-        "dealer_buy_self": column("自營商買進股數", "自行買賣"),
-        "dealer_sell_self": column("自營商賣出股數", "自行買賣"),
-        "dealer_buy_hedge": column("自營商買進股數", "避險"),
-        "dealer_sell_hedge": column("自營商賣出股數", "避險"),
-        "total_net": column("三大法人買賣超股數"),
+        "foreign_buy": foreign("買進股數"),
+        "foreign_sell": foreign("賣出股數"),
+        "invest_buy": column(lambda name: "投信" in name and "買進股數" in name),
+        "invest_sell": column(lambda name: "投信" in name and "賣出股數" in name),
+        "dealer_buy_self": column(
+            lambda name: "自營商買進股數" in name and "自行買賣" in name
+        ),
+        "dealer_sell_self": column(
+            lambda name: "自營商賣出股數" in name and "自行買賣" in name
+        ),
+        "dealer_buy_hedge": column(
+            lambda name: "自營商買進股數" in name and "避險" in name
+        ),
+        "dealer_sell_hedge": column(
+            lambda name: "自營商賣出股數" in name and "避險" in name
+        ),
+        "total_net": column(lambda name: "三大法人買賣超股數" in name),
     }
+    if any(positions[key] is None for key in (
+        "foreign_buy", "foreign_sell", "invest_buy", "invest_sell", "total_net"
+    )):
+        raise RuntimeError(f"TWSE T86 未知欄位格式：{fields}")
     rows = []
     for raw in payload["data"]:
         code = str(raw[0]).strip()
@@ -201,15 +219,27 @@ def fetch_tpex_institutional_by_date(trade_date: date, session=None) -> list[dic
     tables = payload.get("tables") or []
     if str(payload.get("stat", "")).lower() != "ok" or not tables:
         return []
+    table = next((table for table in tables if table.get("data")), None)
+    if table is None:
+        return []
     rows = []
-    for raw in tables[0].get("data", []):
-        if len(raw) < 24 or not is_stock_code(raw[0]):
+    for raw in table.get("data", []):
+        if not raw or not is_stock_code(raw[0]):
             continue
         value = lambda index: clean_int(raw[index])
-        rows.append(_institutional_row(
-            str(raw[0]).strip(), trade_date,
-            value(2), value(3), value(11), value(12), value(20), value(21), value(23),
-        ))
+        if len(raw) >= 24:
+            values = (
+                value(2), value(3), value(11), value(12),
+                value(20), value(21), value(23),
+            )
+        elif len(raw) >= 16:
+            values = (
+                value(2), value(3), value(5), value(6),
+                value(9) + value(12), value(10) + value(13), value(15),
+            )
+        else:
+            raise RuntimeError(f"TPEX 法人未知欄位格式：{len(raw)} 欄")
+        rows.append(_institutional_row(str(raw[0]).strip(), trade_date, *values))
     return rows
 
 

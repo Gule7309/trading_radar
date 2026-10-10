@@ -59,6 +59,7 @@ def test_roc_date_formats():
     assert parse_roc_date("115.10.07") == date(2026, 10, 7)
     assert parse_roc_date("115年09月01日") == date(2026, 9, 1)
     assert parse_roc_date("*115/07/24") == date(2026, 7, 24)
+    assert parse_roc_date("104-11-26") == date(2015, 11, 26)
     assert parse_roc_date("N/A") is None
     assert parse_roc_period("115/10/08～115/10/15") == (date(2026, 10, 8), date(2026, 10, 15))
     assert parse_roc_period("115/10/08~115/10/19") == (date(2026, 10, 8), date(2026, 10, 19))
@@ -159,12 +160,15 @@ def test_delisted_marks_inactive_but_keeps_reused_codes(tmp_path):
     store.upsert("daily_prices", [
         {"stock_id": "1101", "trade_date": "2026-10-08", "close": 30.0},
     ], ("stock_id", "trade_date"))
-    session = Session({corporate.URL_TWSE_DELISTED: [
-        {"DelistingDate": "115/09/01", "Company": "三商壽", "Code": "2867"},
-        {"DelistingDate": "100/01/03", "Company": "舊台泥", "Code": "1101"},
-        {"DelistingDate": "114/05/05", "Company": "已下市", "Code": "9999"},
-        {"DelistingDate": "114/05/05", "Company": "權證", "Code": "030001"},
-    ]})
+    session = Session({
+        corporate.URL_TWSE_DELISTED: [
+            {"DelistingDate": "115/09/01", "Company": "三商壽", "Code": "2867"},
+            {"DelistingDate": "100/01/03", "Company": "舊台泥", "Code": "1101"},
+            {"DelistingDate": "114/05/05", "Company": "已下市", "Code": "9999"},
+            {"DelistingDate": "114/05/05", "Company": "權證", "Code": "030001"},
+        ],
+        corporate.URL_TPEX_DELISTED: {"stat": "ok", "tables": [{"data": []}]},
+    })
     result = RefreshService(store, session=session).refresh_delisted()
     assert result["rows"] == 3
     rows = {r[0]: r[1:] for r in _query(store, "SELECT stock_id, is_active, delisting_date FROM stocks")}
@@ -173,12 +177,26 @@ def test_delisted_marks_inactive_but_keeps_reused_codes(tmp_path):
     assert rows["9999"] == (0, "2025-05-05")
 
 
+def test_tpex_delisted_parser_uses_official_year_query():
+    session = Session({corporate.URL_TPEX_DELISTED: {
+        "stat": "ok", "tables": [{"data": [
+            ["5506", "長鴻營造股份有限公司", "104-11-26", "原因", "url"],
+        ]}],
+    }})
+    rows = corporate.fetch_tpex_delisted([2015], session=session)
+    assert rows == [{
+        "stock_id": "5506", "stock_name": "長鴻營造股份有限公司",
+        "delisting_date": date(2015, 11, 26), "market": "TPEX",
+    }]
+    assert session.calls[0][1]["date"] == "2015"
+
+
 def test_industry_profiles_only_fill_blanks(tmp_path):
     store = DataStore(tmp_path / "t.sqlite")
     store.ensure_schema()
     store.upsert("stocks", [
         {"stock_id": "2330", "stock_name": "台積電", "market": "TWSE", "industry_code": "電子工業"},
-        {"stock_id": "6488", "stock_name": "環球晶", "market": "TPEX", "industry_code": None},
+        {"stock_id": "6488", "stock_name": None, "market": "TPEX", "industry_code": None},
     ], ("stock_id",))
     store.upsert("stock_industry_map", [{"stock_id": "2330", "industry_code": "電子工業"}],
                  ("stock_id", "industry_code"))
@@ -196,9 +214,9 @@ def test_industry_profiles_only_fill_blanks(tmp_path):
     result = RefreshService(store, session=session).refresh_industries()
     assert result["unmapped_industry_codes"] == ["99"]
     stocks = {r[0]: r[1:] for r in _query(
-        store, "SELECT stock_id, industry_code, listing_date FROM stocks")}
-    assert stocks["2330"] == ("電子工業", "1994-09-05")  # 既有分類不覆寫，只補上市日
-    assert stocks["6488"] == ("半導體業", "2015-09-25")
+        store, "SELECT stock_id, stock_name, industry_code, listing_date FROM stocks")}
+    assert stocks["2330"] == ("台積電", "電子工業", "1994-09-05")  # 既有分類不覆寫
+    assert stocks["6488"] == ("環球晶", "半導體業", "2015-09-25")
     assert "7777" not in stocks  # 不在股票 master 的代號不自行新增
     assert sorted(_query(store, "SELECT stock_id, industry_code FROM stock_industry_map")) == [
         ("2330", "電子工業"), ("6488", "半導體業")]
@@ -209,6 +227,7 @@ def test_refresh_all_isolates_failures(tmp_path, monkeypatch):
     store = DataStore(tmp_path / "t.sqlite")
     service = RefreshService(store, session=Session({
         corporate.URL_TWSE_DELISTED: [{"DelistingDate": "115/09/01", "Company": "三商壽", "Code": "2867"}],
+        corporate.URL_TPEX_DELISTED: {"stat": "ok", "tables": [{"data": []}]},
     }))
     result = service.refresh_all(since=date(2026, 10, 10), until=date(2026, 10, 9), delay=0)
     assert result["delisted"]["rows"] == 1
