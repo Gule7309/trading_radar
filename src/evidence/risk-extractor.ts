@@ -18,6 +18,7 @@ export class LlmRiskExtractor implements RiskExtractor {
         "Do not invent generic investment risks.",
         "Each risk must cite one or more sourceIds that contain evidence for it.",
         "Prefer company-specific and current risks.",
+        "If candidate riskFlags are supplied, explicitly investigate them. Set addressesRiskFlags only when the cited source actually explains that flag.",
         "Discovery-only Tier-3 search snippets are intentionally excluded from this task.",
         "Do not provide chain-of-thought.",
       ].join("\n"),
@@ -25,6 +26,7 @@ export class LlmRiskExtractor implements RiskExtractor {
         candidate: {
           ticker: state.candidate.ticker,
           companyName: state.candidate.companyName,
+          riskFlags: state.candidate.riskFlags ?? [],
         },
         sources: state.sources
           .filter((source) => source.sourceTier <= 2)
@@ -47,6 +49,7 @@ export class LlmRiskExtractor implements RiskExtractor {
         .digest("hex")
         .slice(0, 16)}`,
       ...risk,
+      addressesRiskFlags: risk.addressesRiskFlags ?? [],
     }));
   }
 }
