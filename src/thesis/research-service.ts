@@ -34,6 +34,18 @@ export class ThesisResearchService {
     };
   }
 
+  async getLatest(thesisId: string) {
+    return this.theses.getLatest(thesisId);
+  }
+
+  async listVersions(thesisId: string) {
+    return this.theses.listVersions(thesisId);
+  }
+
+  async listEvents(thesisId: string) {
+    return this.theses.listEvents(thesisId);
+  }
+
   async recheck(
     thesisId: string,
     candidate: CandidatePacket,
