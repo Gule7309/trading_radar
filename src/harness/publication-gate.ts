@@ -7,6 +7,7 @@ export type PublicationGateFailure =
   | "FINANCIAL_CORE_WITHOUT_PRIMARY"
   | "NO_RISK_IDENTIFIED"
   | "RISK_DISCOVERY_ONLY"
+  | "UPSTREAM_RISK_FLAG_UNADDRESSED"
   | "HIGH_CONFLICT";
 
 export type PublicationGateResult =
@@ -71,6 +72,17 @@ export function evaluatePublicationGate(
     ) {
       return { ok: false, reason: "RISK_DISCOVERY_ONLY" };
     }
+  }
+
+  const requiredRiskFlags = state.candidate.riskFlags ?? [];
+  const addressedRiskFlags = new Set(
+    state.risks.flatMap((risk) => risk.addressesRiskFlags ?? []),
+  );
+
+  if (
+    requiredRiskFlags.some((flag) => !addressedRiskFlags.has(flag))
+  ) {
+    return { ok: false, reason: "UPSTREAM_RISK_FLAG_UNADDRESSED" };
   }
 
   const hasHighConflict = state.conflicts.some(
