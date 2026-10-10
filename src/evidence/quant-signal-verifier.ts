@@ -67,18 +67,25 @@ export function verifyQuantSignalsAgainstOfficialSources(
     const actual = source.metadata?.[mapping.metadataKey];
     if (typeof actual !== "number") continue;
 
+    const normalizedClaimed =
+      mapping.unit === "%" &&
+      Math.abs(signal.value) <= 2 &&
+      Math.abs(actual) > 2
+        ? signal.value * 100
+        : signal.value;
+
     const verification = verifyNumericClaim({
-      claimed: signal.value,
+      claimed: normalizedClaimed,
       actual,
       absoluteTolerance: mapping.unit === "%" ? 0.05 : 1,
       relativeTolerance: 1e-4,
     });
 
     const claimText =
-      `${signal.period} ${mapping.label} was ${signal.value}${mapping.unit ?? ""}.`;
+      `${signal.period} ${mapping.label} was ${normalizedClaimed}${mapping.unit ?? ""}.`;
     const claimId = id(
       "claim-quant",
-      `${state.candidate.ticker}|${signal.metric}|${signal.period}|${signal.value}`,
+      `${state.candidate.ticker}|${signal.metric}|${signal.period}|${normalizedClaimed}`,
     );
 
     claims.push({
@@ -98,7 +105,7 @@ export function verifyQuantSignalsAgainstOfficialSources(
       verifierReason:
         verification.result === "SUPPORTED"
           ? `Deterministic numeric check matched official ${mapping.label}; difference=${verification.difference}.`
-          : `Deterministic numeric check disagreed with official ${mapping.label}; claimed=${signal.value}, actual=${actual}.`,
+          : `Deterministic numeric check disagreed with official ${mapping.label}; claimed=${normalizedClaimed}, actual=${actual}.`,
     });
   }
 
