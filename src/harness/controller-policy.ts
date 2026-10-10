@@ -30,6 +30,19 @@ export function enforceControllerPolicy(
   const hasFetchedSecondarySource = state.sources.some(
     (source) => source.sourceTier === 2,
   );
+  const hasVerifiedUpstreamEvidence = (
+    state.candidate.upstreamEvidence ?? []
+  ).some((evidence) => evidence.verificationStatus === "verified");
+
+  if (
+    state.claims.length === 0 &&
+    hasVerifiedUpstreamEvidence &&
+    action.type !== "VERIFY"
+  ) {
+    return forceVerify(
+      "Verified screening-output-v1 evidence is already available; establish deterministic quantitative claims before any additional research.",
+    );
+  }
 
   if (
     action.type === "SEARCH_OFFICIAL" &&
