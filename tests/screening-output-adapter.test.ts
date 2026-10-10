@@ -227,6 +227,52 @@ describe("screening-output-v1 adapter", () => {
     expect(hydrated.openQuestions[0]?.text).toMatch(/notice-stock/);
   });
 
+  it("forces deterministic verification before any dynamic research when A evidence is present", () => {
+    const [candidate] = screeningOutputToCandidatePackets(
+      screeningFixture(),
+    );
+    if (!candidate) throw new Error("fixture failed");
+
+    const hydrated = hydrateUpstreamEvidence(candidate);
+    const state: ResearchState = {
+      runId: "run",
+      candidate,
+      phase: "DISCOVERY",
+      knownFacts: hydrated.knownFacts,
+      openQuestions: hydrated.openQuestions,
+      sources: hydrated.sources,
+      claims: [],
+      evidence: [],
+      risks: [],
+      conflicts: [],
+      budget: {
+        stepsUsed: 0,
+        maxSteps: 12,
+        searchesUsed: 0,
+        maxSearches: 5,
+        skepticRounds: 0,
+        maxSkepticRounds: 1,
+        startedAt: "2026-10-10T00:00:00Z",
+      },
+      researchTrace: [],
+      evidenceDirty: true,
+      invalidationConditions: [],
+    };
+
+    const decision = enforceControllerPolicy(state, {
+      reasonCode: "MODEL_SEARCH_NEWS",
+      summary: "Search current news first.",
+      action: {
+        type: "SEARCH_NEWS",
+        purpose: "current context",
+        query: "2330 台積電",
+      },
+    });
+
+    expect(decision.action.type).toBe("VERIFY");
+    expect(decision.reasonCode).toBe("POLICY_FORCE_VERIFY");
+  });
+
   it("prevents duplicate monthly-revenue research when A already verified it", () => {
     const [candidate] = screeningOutputToCandidatePackets(
       screeningFixture(),
