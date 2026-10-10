@@ -11,6 +11,8 @@ import {
 } from "./claim-extractor.js";
 import type { TextualVerifier } from "./textual-verifier.js";
 import type { RiskExtractor } from "./risk-extractor.js";
+import { eligibleEvidenceSources } from "./source-eligibility.js";
+import { verifyQuantSignalsAgainstOfficialSources } from "./quant-signal-verifier.js";
 
 export interface VerificationPipeline {
   run(state: ResearchState): Promise<void>;
@@ -51,13 +53,23 @@ export class DefaultVerificationPipeline implements VerificationPipeline {
   ) {}
 
   async run(state: ResearchState): Promise<void> {
-    const extractedClaims = await this.claimExtractor.extract(state);
-    const sourceById = new Map(
-      state.sources.map((source) => [source.sourceId, source]),
+    const eligibleSources = eligibleEvidenceSources(
+      state.sources,
+      state.candidate,
     );
+    const projectedState: ResearchState = {
+      ...state,
+      sources: eligibleSources,
+    };
 
-    state.claims = [];
-    state.evidence = [];
+    const extractedClaims = await this.claimExtractor.extract(projectedState);
+    const sourceById = new Map(
+      eligibleSources.map((source) => [source.sourceId, source]),
+    );
+    const quant = verifyQuantSignalsAgainstOfficialSources(state);
+
+    state.claims = [...quant.claims];
+    state.evidence = [...quant.evidence];
     state.conflicts = [];
 
     for (const extracted of extractedClaims) {
@@ -68,6 +80,10 @@ export class DefaultVerificationPipeline implements VerificationPipeline {
         importance: extracted.importance,
         status: "PENDING",
       };
+
+      if (state.claims.some((item) => item.claimId === claim.claimId)) {
+        continue;
+      }
 
       const claimEvidence: EvidenceLink[] = [];
 
@@ -97,15 +113,20 @@ export class DefaultVerificationPipeline implements VerificationPipeline {
 
       claim.status = aggregateClaimStatus(claimEvidence);
       state.claims.push(claim);
+    }
 
-      const conflict = detectVerificationConflict(claim, claimEvidence);
+    for (const claim of state.claims) {
+      const conflict = detectVerificationConflict(claim, state.evidence);
       if (conflict) {
+        claim.status = "CONFLICTING";
         state.conflicts.push(conflict);
       }
     }
 
-    const validSourceIds = new Set(state.sources.map((source) => source.sourceId));
-    const extractedRisks = await this.riskExtractor.extract(state);
+    const validSourceIds = new Set(
+      eligibleSources.map((source) => source.sourceId),
+    );
+    const extractedRisks = await this.riskExtractor.extract(projectedState);
 
     state.risks = extractedRisks
       .map((risk) => ({
