@@ -145,6 +145,7 @@ export interface ResearchBudget {
   maxSearches: number;
   skepticRounds: number;
   maxSkepticRounds: number;
+  maxDurationMs?: number;
   startedAt: string;
 }
 
