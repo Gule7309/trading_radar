@@ -1,6 +1,7 @@
 import type { ResearchState } from "../domain/research.js";
 import type { ControllerDecision } from "../agent/controller.js";
 import { shouldRunSkeptic } from "../agent/skeptic.js";
+import { hasUpstreamMonthlyRevenue } from "../evidence/upstream-evidence.js";
 
 function verificationReady(state: ResearchState): boolean {
   return state.sources.some((source) => source.sourceTier <= 2);
@@ -29,6 +30,16 @@ export function enforceControllerPolicy(
   const hasFetchedSecondarySource = state.sources.some(
     (source) => source.sourceTier === 2,
   );
+
+  if (
+    action.type === "SEARCH_OFFICIAL" &&
+    action.dataset === "MONTHLY_REVENUE" &&
+    hasUpstreamMonthlyRevenue(state.candidate)
+  ) {
+    return forceVerify(
+      "Verified monthly-revenue evidence already arrived from screening-output-v1; reuse it instead of repeating the same official lookup.",
+    );
+  }
 
   if (
     state.evidenceDirty &&
