@@ -57,14 +57,20 @@ export class DefaultVerificationPipeline implements VerificationPipeline {
       state.sources,
       state.candidate,
     );
+    const textualSources = eligibleSources.filter(
+      (source) => source.metadata?.origin !== "screening-output-v1",
+    );
     const projectedState: ResearchState = {
       ...state,
-      sources: eligibleSources,
+      sources: textualSources,
     };
 
-    const extractedClaims = await this.claimExtractor.extract(projectedState);
+    const extractedClaims =
+      textualSources.length > 0
+        ? await this.claimExtractor.extract(projectedState)
+        : [];
     const sourceById = new Map(
-      eligibleSources.map((source) => [source.sourceId, source]),
+      textualSources.map((source) => [source.sourceId, source]),
     );
     const quant = verifyQuantSignalsAgainstOfficialSources(state);
 
@@ -124,9 +130,12 @@ export class DefaultVerificationPipeline implements VerificationPipeline {
     }
 
     const validSourceIds = new Set(
-      eligibleSources.map((source) => source.sourceId),
+      textualSources.map((source) => source.sourceId),
     );
-    const extractedRisks = await this.riskExtractor.extract(projectedState);
+    const extractedRisks =
+      textualSources.length > 0
+        ? await this.riskExtractor.extract(projectedState)
+        : [];
 
     state.risks = extractedRisks
       .map((risk) => ({
