@@ -1,0 +1,143 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Gule7309/trading_radar/screening-output-v1",
+  "title": "Screening output v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "run", "candidates", "evidence", "excluded"],
+  "properties": {
+    "schemaVersion": { "const": "screening-output-v1" },
+    "run": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["runId", "runAt", "asOfDate", "priceAsOf", "revenueAsOf", "revenueCoverage",
+                   "financialAsOf", "financialCoverage", "configVersion", "dataVersion",
+                   "sourceSnapshot", "status", "profile", "config", "counts"],
+      "properties": {
+        "runId": { "type": "string", "pattern": "^[0-9]{8}-[0-9]{3,}$" },
+        "runAt": { "type": "string" },
+        "asOfDate": { "type": "string", "format": "date" },
+        "priceAsOf": { "type": "string", "format": "date" },
+        "revenueAsOf": { "type": "string", "pattern": "^[0-9]{4}-[0-9]{2}$" },
+        "revenueCoverage": { "type": "number", "minimum": 0 },
+        "financialAsOf": { "type": "string", "pattern": "^[0-9]{4}Q[1-4]$" },
+        "financialCoverage": { "type": "number", "minimum": 0 },
+        "configVersion": { "type": "string" },
+        "dataVersion": { "type": "string" },
+        "sourceSnapshot": { "type": ["string", "null"] },
+        "status": { "const": "success" },
+        "profile": { "type": "object" },
+        "config": { "type": "object" },
+        "counts": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["universe", "baseEligible", "ranked"],
+          "properties": {
+            "universe": { "type": "integer", "minimum": 0 },
+            "baseEligible": { "type": "integer", "minimum": 0 },
+            "ranked": { "type": "integer", "minimum": 0 }
+          }
+        }
+      }
+    },
+    "candidates": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/candidate" }
+    },
+    "evidence": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/evidence" }
+    },
+    "excluded": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["total", "byStage", "byReason"],
+      "properties": {
+        "total": { "type": "integer", "minimum": 0 },
+        "byStage": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["base", "constraint"],
+          "properties": {
+            "base": { "type": "integer", "minimum": 0 },
+            "constraint": { "type": "integer", "minimum": 0 }
+          }
+        },
+        "byReason": { "type": "object", "additionalProperties": { "type": "integer", "minimum": 0 } }
+      }
+    }
+  },
+  "$defs": {
+    "metric": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["value", "percentile", "evidenceId"],
+      "properties": {
+        "value": { "type": "number" },
+        "percentile": { "type": ["number", "null"], "minimum": 0, "maximum": 1 },
+        "evidenceId": { "type": "string", "pattern": "^ev-[0-9]{3,}$" }
+      }
+    },
+    "candidate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["stockId", "stockName", "market", "industry", "percentileScope", "metrics",
+                   "riskFlags", "quantScore", "rank"],
+      "properties": {
+        "stockId": { "type": "string" },
+        "stockName": { "type": ["string", "null"] },
+        "market": { "type": ["string", "null"] },
+        "industry": { "type": ["string", "null"] },
+        "percentileScope": { "enum": ["industry", "market"] },
+        "metrics": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["revenueYoY", "operatingMargin", "debtRatio", "avgTurnover20d"],
+          "properties": {
+            "revenueYoY": { "$ref": "#/$defs/metric" },
+            "operatingMargin": { "$ref": "#/$defs/metric" },
+            "debtRatio": { "$ref": "#/$defs/metric" },
+            "avgTurnover20d": { "$ref": "#/$defs/metric" }
+          }
+        },
+        "riskFlags": { "type": "array", "items": { "enum": ["notice", "disposition"] }, "uniqueItems": true },
+        "quantScore": { "type": "number", "minimum": 0, "maximum": 1 },
+        "rank": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "evidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "stockId", "metric", "claim", "value", "unit", "dataset", "source",
+                   "sourceUrl", "referenceUrl", "dataAsOf", "windowStart", "windowEnd", "fetchedAt",
+                   "fetchedAtScope", "calculation", "verificationStatus"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^ev-[0-9]{3,}$" },
+        "stockId": { "type": "string" },
+        "metric": { "enum": ["revenueYoY", "operatingMargin", "debtRatio", "avgTurnover20d"] },
+        "claim": { "type": "string", "minLength": 1 },
+        "value": { "type": "number" },
+        "unit": { "enum": ["%", "TWD"] },
+        "dataset": { "type": "string" },
+        "source": { "type": "string", "minLength": 1 },
+        "sourceUrl": { "type": ["string", "null"] },
+        "referenceUrl": { "type": ["string", "null"] },
+        "dataAsOf": { "type": "string", "minLength": 1 },
+        "windowStart": { "type": "string" },
+        "windowEnd": { "type": "string" },
+        "fetchedAt": { "type": ["string", "null"] },
+        "fetchedAtScope": { "enum": ["row", "dataset"] },
+        "calculation": {
+          "type": "object",
+          "required": ["formula", "inputs"],
+          "properties": {
+            "formula": { "type": "string" },
+            "method": { "type": "string", "description": "實際做了哪一種驗證（是否為獨立來源比對）" },
+            "inputs": { "type": "object" }
+          }
+        },
+        "verificationStatus": { "enum": ["verified", "partial", "conflict", "insufficient"] }
+      }
+    }
+  }
+}

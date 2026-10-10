@@ -15,11 +15,12 @@ import sys
 from contextlib import closing
 from datetime import date, timedelta
 from pathlib import Path
+from typing import Any
 from urllib.parse import urljoin, urlparse
 
 import requests
 
-from .db import DataStore, now_iso
+from .db import DataStore, dataset_status_digest, now_iso
 
 MANIFEST_FORMAT = "taiwan-stock-data-distribution-v1"
 KINDS = ("full", "demo")
@@ -107,8 +108,13 @@ def download_snapshot(
     if manifest.get("format") != MANIFEST_FORMAT or manifest.get("kind") != kind:
         raise ValueError("manifest 格式或 kind 不符")
 
-    if dest.is_file() and not force and sha256_file(dest) == manifest["database_sha256"]:
-        return {"status": "up_to_date", "database": str(dest), "version": manifest["version"]}
+    if dest.is_file() and not force:
+        if _is_current(dest, manifest, kind):
+            return {"status": "up_to_date", "database": str(dest), "version": manifest["version"]}
+        # 舊版下載沒有本機 manifest：退回比對整個檔案的雜湊。
+        if not dest.with_suffix(".manifest.json").is_file() and sha256_file(dest) == manifest["database_sha256"]:
+            _write_local_manifest(dest, manifest, base)
+            return {"status": "up_to_date", "database": str(dest), "version": manifest["version"]}
     # 有未合併的 WAL 代表可能有程序正在寫入；此時直接替換主檔會讓舊 WAL 套用到新檔而毀損。
     wal = dest.with_name(dest.name + "-wal")
     if wal.is_file() and wal.stat().st_size > 0:
@@ -134,8 +140,53 @@ def download_snapshot(
     finally:
         part_gz.unlink(missing_ok=True)
         part_db.unlink(missing_ok=True)
+    _write_local_manifest(dest, manifest, base)
     return {"status": "downloaded", "database": str(dest), "version": manifest["version"],
             "as_of": manifest["as_of"], "kind": kind}
+
+
+def _data_version_read_only(db: Path) -> str:
+    """以唯讀連線計算 data_version。一般連線會把資料庫切成 WAL 模式並改寫檔頭，使檔案雜湊改變。"""
+    try:
+        with closing(sqlite3.connect(f"file:{db.as_posix()}?mode=ro", uri=True)) as conn:
+            return dataset_status_digest(conn)
+    except sqlite3.OperationalError:  # 已是 WAL 模式且無法唯讀開啟時；此時切換模式不會再改檔頭
+        return DataStore(db).data_version()
+
+
+def _is_current(dest: Path, manifest: dict[str, Any], kind: str) -> bool:
+    """本機資料是否就是 manifest 這一版。
+
+    不比對整個檔案的雜湊：下載後只要開過資料庫（status、screen），WAL 模式與 screening 結果就會改變檔案，
+    但原始資料仍是同一版。改以下載時寫下的本機 manifest 與目前的 data_version 判斷。
+    """
+    try:
+        local = json.loads(dest.with_suffix(".manifest.json").read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return False
+    dist = local.get("distribution") or {}
+    return (dist.get("kind") == kind and dist.get("version") == manifest["version"]
+            and local.get("sha256") == manifest["database_sha256"]
+            and local.get("data_version") == _data_version_read_only(dest))
+
+
+def _write_local_manifest(dest: Path, manifest: dict[str, Any], source: str) -> None:
+    """在資料庫旁寫入 <db>.manifest.json，讓之後的 screening run 能以 sourceSnapshot 引用此版本。
+
+    格式與 `taiwan-data manifest` 相容；SHA-256 直接沿用已驗證過的 manifest 值，不重新雜湊。
+    """
+    local = {
+        "format": "taiwan-stock-data-snapshot-v1",
+        "updated_at": now_iso(),
+        "database": dest.name,
+        "database_bytes": dest.stat().st_size,
+        "sha256": manifest["database_sha256"],
+        "data_version": _data_version_read_only(dest),
+        "distribution": {"kind": manifest["kind"], "version": manifest["version"],
+                         "as_of": manifest["as_of"], "source": source},
+    }
+    dest.with_suffix(".manifest.json").write_text(
+        json.dumps(local, ensure_ascii=False, indent=2), encoding="utf-8")
 
 
 def sha256_file(path: Path) -> str:

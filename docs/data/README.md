@@ -3,6 +3,17 @@
 `packages/taiwan_data` 是從 `taiwan_stock_advisor` 拆出的資料層：一個 SQLite 檔＋從官方來源
 增量更新的 CLI（`taiwan-data`）。不依賴 Neon、FinMind 或任何 API key。
 
+## 文件導覽
+
+| 你是… | 先讀 |
+|---|---|
+| 第一次接觸這個專案 | [data-status.md](data-status.md) 資料現況 → [limitations-and-decisions.md](limitations-and-decisions.md) 限制與設計決策 |
+| Agent／Frontend 開發者 | [usage-guide.md](usage-guide.md) 使用指南 → [candidate-evidence-contract.md](candidate-evidence-contract.md) JSON 契約 |
+| 要直接查 SQL | [data-dictionary.md](data-dictionary.md) 資料字典（欄位、單位、陷阱） |
+| 想知道排名怎麼算 | [screening.md](screening.md) Screening 規格 |
+| 資料維護者 | 本文件（建置、資料集、排程、分發）→ [operations.md](operations.md) 維運手冊 |
+| 規劃與歷史 | [backfill-evaluation.md](backfill-evaluation.md) 回補評估、[cloud-scheduling.md](cloud-scheduling.md) 上雲規劃 |
+
 ## 目錄
 
 ```text
@@ -10,7 +21,7 @@ packages/taiwan_data/        套件原始碼與測試
 scripts/windows/             本機每日排程（Windows 工作排程器）
 var/data/taiwan_stock.sqlite 資料庫（不進 Git，約 1 GB）
 var/logs/                    排程與手動更新紀錄（不進 Git）
-docs/data/                   本文件、回補評估、上雲規劃
+docs/data/                   本文件、回補評估、上雲規劃、screening 規格（screening.md）
 ```
 
 ## 本機建置

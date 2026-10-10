@@ -1,0 +1,1319 @@
+{
+  "schemaVersion": "screening-output-v1",
+  "run": {
+    "runId": "20261010-002",
+    "runAt": "2026-10-10T14:31:07+08:00",
+    "asOfDate": "2026-10-10",
+    "priceAsOf": "2026-10-08",
+    "revenueAsOf": "2026-08",
+    "revenueCoverage": 1.000539,
+    "financialAsOf": "2026Q2",
+    "financialCoverage": 0.997421,
+    "configVersion": "v1",
+    "dataVersion": "ds-130b1ff5d3e877e2",
+    "sourceSnapshot": "sha256:287b6a413bd3ada6dbc80b74270e716a507bd66dbbf82679c59c68556dae5b43",
+    "status": "success",
+    "profile": {
+      "excludeDisposition": true,
+      "excludedIndustries": [],
+      "maxDebtRatio": null,
+      "minLiquidity": 100000000.0,
+      "weights": {
+        "growth": 1.0,
+        "profitability": 1.0,
+        "safety": 1.0
+      }
+    },
+    "config": {
+      "debtTolerancePp": 0.1,
+      "evidenceTopK": 50,
+      "financialCoverageThreshold": 0.95,
+      "marginTolerancePp": 0.1,
+      "minIndustrySize": 5,
+      "noticeLookbackDays": 30,
+      "priceCoverageThreshold": 0.95,
+      "revenueCoverageThreshold": 0.95,
+      "scanPeriods": 6,
+      "turnoverWindowDays": 20,
+      "version": "v1",
+      "yoyTolerancePp": 0.1
+    },
+    "counts": {
+      "universe": 2394,
+      "baseEligible": 1639,
+      "ranked": 428
+    }
+  },
+  "candidates": [
+    {
+      "stockId": "2059",
+      "stockName": "川湖",
+      "market": "TWSE",
+      "industry": "電子工業",
+      "percentileScope": "industry",
+      "metrics": {
+        "revenueYoY": {
+          "value": 344.4151,
+          "percentile": 0.994186,
+          "evidenceId": "ev-001"
+        },
+        "operatingMargin": {
+          "value": 82.0846,
+          "percentile": 1.0,
+          "evidenceId": "ev-002"
+        },
+        "debtRatio": {
+          "value": 28.352,
+          "percentile": 0.889535,
+          "evidenceId": "ev-003"
+        },
+        "avgTurnover20d": {
+          "value": 6122820101.75,
+          "percentile": null,
+          "evidenceId": "ev-004"
+        }
+      },
+      "riskFlags": [
+        "notice"
+      ],
+      "quantScore": 0.96124,
+      "rank": 1
+    },
+    {
+      "stockId": "2305",
+      "stockName": "全友",
+      "market": "TWSE",
+      "industry": "電子工業",
+      "percentileScope": "industry",
+      "metrics": {
+        "revenueYoY": {
+          "value": 239.9854,
+          "percentile": 0.988372,
+          "evidenceId": "ev-005"
+        },
+        "operatingMargin": {
+          "value": 23.5666,
+          "percentile": 0.930233,
+          "evidenceId": "ev-006"
+        },
+        "debtRatio": {
+          "value": 24.4512,
+          "percentile": 0.930233,
+          "evidenceId": "ev-007"
+        },
+        "avgTurnover20d": {
+          "value": 986013323.55,
+          "percentile": null,
+          "evidenceId": "ev-008"
+        }
+      },
+      "riskFlags": [
+        "notice"
+      ],
+      "quantScore": 0.949613,
+      "rank": 2
+    },
+    {
+      "stockId": "2408",
+      "stockName": "南亞科",
+      "market": "TWSE",
+      "industry": "半導體業",
+      "percentileScope": "industry",
+      "metrics": {
+        "revenueYoY": {
+          "value": 560.8541,
+          "percentile": 0.994382,
+          "evidenceId": "ev-009"
+        },
+        "operatingMargin": {
+          "value": 73.685,
+          "percentile": 0.994382,
+          "evidenceId": "ev-010"
+        },
+        "debtRatio": {
+          "value": 16.7784,
+          "percentile": 0.837079,
+          "evidenceId": "ev-011"
+        },
+        "avgTurnover20d": {
+          "value": 22051025879.95,
+          "percentile": null,
+          "evidenceId": "ev-012"
+        }
+      },
+      "riskFlags": [],
+      "quantScore": 0.941948,
+      "rank": 3
+    },
+    {
+      "stockId": "7828",
+      "stockName": "創新服務",
+      "market": "TPEX",
+      "industry": "半導體業",
+      "percentileScope": "industry",
+      "metrics": {
+        "revenueYoY": {
+          "value": 192.1368,
+          "percentile": 0.926966,
+          "evidenceId": "ev-013"
+        },
+        "operatingMargin": {
+          "value": 45.3613,
+          "percentile": 0.94382,
+          "evidenceId": "ev-014"
+        },
+        "debtRatio": {
+          "value": 10.5471,
+          "percentile": 0.955056,
+          "evidenceId": "ev-015"
+        },
+        "avgTurnover20d": {
+          "value": 587396355.0,
+          "percentile": null,
+          "evidenceId": "ev-016"
+        }
+      },
+      "riskFlags": [],
+      "quantScore": 0.941947,
+      "rank": 4
+    },
+    {
+      "stockId": "3653",
+      "stockName": "健策",
+      "market": "TWSE",
+      "industry": "電子工業",
+      "percentileScope": "industry",
+      "metrics": {
+        "revenueYoY": {
+          "value": 90.9032,
+          "percentile": 0.895349,
+          "evidenceId": "ev-017"
+        },
+        "operatingMargin": {
+          "value": 37.792,
+          "percentile": 0.994186,
+          "evidenceId": "ev-018"
+        },
+        "debtRatio": {
+          "value": 28.6859,
+          "percentile": 0.877907,
+          "evidenceId": "ev-019"
+        },
+        "avgTurnover20d": {
+          "value": 7753494663.85,
+          "percentile": null,
+          "evidenceId": "ev-020"
+        }
+      },
+      "riskFlags": [
+        "notice"
+      ],
+      "quantScore": 0.922481,
+      "rank": 5
+    },
+    {
+      "stockId": "3081",
+      "stockName": "聯亞",
+      "market": "TPEX",
+      "industry": "通信網路業",
+      "percentileScope": "industry",
+      "metrics": {
+        "revenueYoY": {
+          "value": 180.9019,
+          "percentile": 0.936709,
+          "evidenceId": "ev-021"
+        },
+        "operatingMargin": {
+          "value": 46.8867,
+          "percentile": 1.0,
+          "evidenceId": "ev-022"
+        },
+        "debtRatio": {
+          "value": 24.1034,
+          "percentile": 0.822785,
+          "evidenceId": "ev-023"
+        },
+        "avgTurnover20d": {
+          "value": 9840203100.0,
+          "percentile": null,
+          "evidenceId": "ev-024"
+        }
+      },
+      "riskFlags": [
+        "notice"
+      ],
+      "quantScore": 0.919831,
+      "rank": 6
+    },
+    {
+      "stockId": "6426",
+      "stockName": "統新",
+      "market": "TWSE",
+      "industry": "通信網路業",
+      "percentileScope": "industry",
+      "metrics": {
+        "revenueYoY": {
+          "value": 78.2087,
+          "percentile": 0.822785,
+          "evidenceId": "ev-025"
+        },
+        "operatingMargin": {
+          "value": 36.1381,
+          "percentile": 0.974684,
+          "evidenceId": "ev-026"
+        },
+        "debtRatio": {
+          "value": 10.2253,
+          "percentile": 0.962025,
+          "evidenceId": "ev-027"
+        },
+        "avgTurnover20d": {
+          "value": 1257437979.5,
+          "percentile": null,
+          "evidenceId": "ev-028"
+        }
+      },
+      "riskFlags": [
+        "notice"
+      ],
+      "quantScore": 0.919831,
+      "rank": 7
+    },
+    {
+      "stockId": "6446",
+      "stockName": "藥華藥",
+      "market": "TWSE",
+      "industry": "化學生技醫療",
+      "percentileScope": "industry",
+      "metrics": {
+        "revenueYoY": {
+          "value": 105.4275,
+          "percentile": 0.902439,
+          "evidenceId": "ev-029"
+        },
+        "operatingMargin": {
+          "value": 46.0279,
+          "percentile": 1.0,
+          "evidenceId": "ev-030"
+        },
+        "debtRatio": {
+          "value": 16.5376,
+          "percentile": 0.829268,
+          "evidenceId": "ev-031"
+        },
+        "avgTurnover20d": {
+          "value": 3622542734.5,
+          "percentile": null,
+          "evidenceId": "ev-032"
+        }
+      },
+      "riskFlags": [],
+      "quantScore": 0.910569,
+      "rank": 8
+    }
+  ],
+  "evidence": [
+    {
+      "id": "ev-001",
+      "stockId": "2059",
+      "metric": "revenueYoY",
+      "claim": "2026-08 月營收年增 344.4%",
+      "value": 344.4151,
+      "unit": "%",
+      "dataset": "monthly_revenue",
+      "source": "MOPS",
+      "sourceUrl": "https://mopsov.twse.com.tw/nas/t21/",
+      "referenceUrl": null,
+      "dataAsOf": "2026-08",
+      "windowStart": "2025-08",
+      "windowEnd": "2026-08",
+      "fetchedAt": "2026-10-10T01:12:21+08:00",
+      "fetchedAtScope": "dataset",
+      "calculation": {
+        "formula": "revenue(month) / revenue(same month last year) - 1",
+        "inputs": {
+          "differencePp": 0.0051,
+          "month": "2026-08",
+          "priorYearMonth": "2025-08",
+          "priorYearRevenue": 1454984.0,
+          "revenue": 6466169.0,
+          "revenueUnit": "TWD thousand",
+          "sourceYoYPct": 344.41
+        },
+        "method": "以營收重算年增率，並與 MOPS 公布的年增率交叉比對（獨立比對，容差見 config）"
+      },
+      "verificationStatus": "verified"
+    },
+    {
+      "id": "ev-002",
+      "stockId": "2059",
+      "metric": "operatingMargin",
+      "claim": "2026Q2 單季營業利益率 82.1%",
+      "value": 82.0846,
+      "unit": "%",
+      "dataset": "quarterly_financials",
+      "source": "MOPS",
+      "sourceUrl": "https://mopsov.twse.com.tw/mops/web/ajax_t163sb04",
+      "referenceUrl": null,
+      "dataAsOf": "2026Q2",
+      "windowStart": "2026Q2",
+      "windowEnd": "2026Q2",
+      "fetchedAt": "2026-10-10T08:52:55+08:00",
+      "fetchedAtScope": "row",
+      "calculation": {
+        "formula": "operating_income_quarter / revenue_quarter",
+        "inputs": {
+          "amountUnit": "TWD thousand",
+          "availabilityCutoff": "2026-08-31",
+          "differencePp": 0.0,
+          "operatingIncomeQuarter": 8889796,
+          "quarter": "2026Q2",
+          "revenueQuarter": 10830041,
+          "sourceOperatingMarginQuarter": 82.08460152643929
+        },
+        "method": "以 MOPS 財報的單季營業利益與單季營收重算，確認輸入完整且與資料表內推導值一致；此指標沒有第二個獨立來源可比對"
+      },
+      "verificationStatus": "verified"
+    },
+    {
+      "id": "ev-003",
+      "stockId": "2059",
+      "metric": "debtRatio",
+      "claim": "2026Q2 負債比 28.4%",
+      "value": 28.352,
+      "unit": "%",
+      "dataset": "quarterly_financials",
+      "source": "MOPS",
+      "sourceUrl": "https://mopsov.twse.com.tw/mops/web/ajax_t163sb05",
+      "referenceUrl": null,
+      "dataAsOf": "2026Q2",
+      "windowStart": "2026Q2",
+      "windowEnd": "2026Q2",
+      "fetchedAt": "2026-10-10T08:52:55+08:00",
+      "fetchedAtScope": "row",
+      "calculation": {
+        "formula": "total_liabilities / total_assets",
+        "inputs": {
+          "amountUnit": "TWD thousand",
+          "availabilityCutoff": "2026-08-31",
+          "differencePp": 0.0,
+          "quarter": "2026Q2",
+          "sourceDebtRatio": 28.352046712125574,
+          "totalAssets": 47110680,
+          "totalLiabilities": 13356842
+        },
+        "method": "以 MOPS 資產負債表的總負債與總資產重算，確認輸入完整且與資料表內推導值一致；此指標沒有第二個獨立來源可比對"
+      },
+      "verificationStatus": "verified"
+    },
+    {
+      "id": "ev-004",
+      "stockId": "2059",
+      "metric": "avgTurnover20d",
+      "claim": "近 20 個交易日（2026-09-09 至 2026-10-08）日均成交金額 61.2 億元",
+      "value": 6122820101.75,
+      "unit": "TWD",
+      "dataset": "daily_prices",
+      "source": "TWSE",
+      "sourceUrl": "https://www.twse.com.tw/rwd/zh/afterTrading/MI_INDEX",
+      "referenceUrl": null,
+      "dataAsOf": "2026-10-08",
+      "windowStart": "2026-09-09",
+      "windowEnd": "2026-10-08",
+      "fetchedAt": "2026-10-10T01:12:16+08:00",
+      "fetchedAtScope": "dataset",
+      "calculation": {
+        "formula": "AVG(turnover) over the last N market trading days",
+        "inputs": {
+          "currency": "TWD",
+          "observedDays": 20,
+          "totalTurnover": 122456402035.0,
+          "tradingDays": 20,
+          "windowEnd": "2026-10-08",
+          "windowStart": "2026-09-09"
+        },
+        "method": "窗口內每個市場交易日都必須有該股成交資料"
+      },
+      "verificationStatus": "verified"
+    },
+    {
+      "id": "ev-005",
+      "stockId": "2305",
+      "metric": "revenueYoY",
+      "claim": "2026-08 月營收年增 240.0%",
+      "value": 239.9854,
+      "unit": "%",
+      "dataset": "monthly_revenue",
+      "source": "MOPS",
+      "sourceUrl": "https://mopsov.twse.com.tw/nas/t21/",
+      "referenceUrl": null,
+      "dataAsOf": "2026-08",
+      "windowStart": "2025-08",
+      "windowEnd": "2026-08",
+      "fetchedAt": "2026-10-10T01:12:21+08:00",
+      "fetchedAtScope": "dataset",
+      "calculation": {
+        "formula": "revenue(month) / revenue(same month last year) - 1",
+        "inputs": {
+          "differencePp": 0.0054,
+          "month": "2026-08",
+          "priorYearMonth": "2025-08",
+          "priorYearRevenue": 53302.0,
+          "revenue": 181219.0,
+          "revenueUnit": "TWD thousand",
+          "sourceYoYPct": 239.98
+        },
+        "method": "以營收重算年增率，並與 MOPS 公布的年增率交叉比對（獨立比對，容差見 config）"
+      },
+      "verificationStatus": "verified"
+    },
+    {
+      "id": "ev-006",
+      "stockId": "2305",
+      "metric": "operatingMargin",
+      "claim": "2026Q2 單季營業利益率 23.6%",
+      "value": 23.5666,
+      "unit": "%",
+      "dataset": "quarterly_financials",
+      "source": "MOPS",
+      "sourceUrl": "https://mopsov.twse.com.tw/mops/web/ajax_t163sb04",
+      "referenceUrl": null,
+      "dataAsOf": "2026Q2",
+      "windowStart": "2026Q2",
+      "windowEnd": "2026Q2",
+      "fetchedAt": "2026-10-10T08:52:55+08:00",
+      "fetchedAtScope": "row",
+      "calculation": {
+        "formula": "operating_income_quarter / revenue_quarter",
+        "inputs": {
+          "amountUnit": "TWD thousand",
+          "availabilityCutoff": "2026-08-31",
+          "differencePp": 0.0,
+          "operatingIncomeQuarter": 90856,
+          "quarter": "2026Q2",
+          "revenueQuarter": 385528,
+          "sourceOperatingMarginQuarter": 23.566641074059472
+        },
+        "method": "以 MOPS 財報的單季營業利益與單季營收重算，確認輸入完整且與資料表內推導值一致；此指標沒有第二個獨立來源可比對"
+      },
+      "verificationStatus": "verified"
+    },
+    {
+      "id": "ev-007",
+      "stockId": "2305",
+      "metric": "debtRatio",
+      "claim": "2026Q2 負債比 24.5%",
+      "value": 24.4512,
+      "unit": "%",
+      "dataset": "quarterly_financials",
+      "source": "MOPS",
+      "sourceUrl": "https://mopsov.twse.com.tw/mops/web/ajax_t163sb05",
+      "referenceUrl": null,
+      "dataAsOf": "2026Q2",
+      "windowStart": "2026Q2",
+      "windowEnd": "2026Q2",
+      "fetchedAt": "2026-10-10T08:52:55+08:00",
+      "fetchedAtScope": "row",
+      "calculation": {
+        "formula": "total_liabilities / total_assets",
+        "inputs": {
+          "amountUnit": "TWD thousand",
+          "availabilityCutoff": "2026-08-31",
+          "differencePp": 0.0,
+          "quarter": "2026Q2",
+          "sourceDebtRatio": 24.45120390065139,
+          "totalAssets": 3464447,
+          "totalLiabilities": 847099
+        },
+        "method": "以 MOPS 資產負債表的總負債與總資產重算，確認輸入完整且與資料表內推導值一致；此指標沒有第二個獨立來源可比對"
+      },
+      "verificationStatus": "verified"
+    },
+    {
+      "id": "ev-008",
+      "stockId": "2305",
+      "metric": "avgTurnover20d",
+      "claim": "近 20 個交易日（2026-09-09 至 2026-10-08）日均成交金額 9.9 億元",
+      "value": 986013323.55,
+      "unit": "TWD",
+      "dataset": "daily_prices",
+      "source": "TWSE",
+      "sourceUrl": "https://www.twse.com.tw/rwd/zh/afterTrading/MI_INDEX",
+      "referenceUrl": null,
+      "dataAsOf": "2026-10-08",
+      "windowStart": "2026-09-09",
+      "windowEnd": "2026-10-08",
+      "fetchedAt": "2026-10-10T01:12:16+08:00",
+      "fetchedAtScope": "dataset",
+      "calculation": {
+        "formula": "AVG(turnover) over the last N market trading days",
+        "inputs": {
+          "currency": "TWD",
+          "observedDays": 20,
+          "totalTurnover": 19720266471.0,
+          "tradingDays": 20,
+          "windowEnd": "2026-10-08",
+          "windowStart": "2026-09-09"
+        },
+        "method": "窗口內每個市場交易日都必須有該股成交資料"
+      },
+      "verificationStatus": "verified"
+    },
+    {
+      "id": "ev-009",
+      "stockId": "2408",
+      "metric": "revenueYoY",
+      "claim": "2026-08 月營收年增 560.9%",
+      "value": 560.8541,
+      "unit": "%",
+      "dataset": "monthly_revenue",
+      "source": "MOPS",
+      "sourceUrl": "https://mopsov.twse.com.tw/nas/t21/",
+      "referenceUrl": null,
+      "dataAsOf": "2026-08",
+      "windowStart": "2025-08",
+      "windowEnd": "2026-08",
+      "fetchedAt": "2026-10-10T01:12:21+08:00",
+      "fetchedAtScope": "dataset",
+      "calculation": {
+        "formula": "revenue(month) / revenue(same month last year) - 1",
+        "inputs": {
+          "differencePp": 0.0041,
+          "month": "2026-08",
+          "priorYearMonth": "2025-08",
+          "priorYearRevenue": 6762501.0,
+          "revenue": 44690268.0,
+          "revenueUnit": "TWD thousand",
+          "sourceYoYPct": 560.85
+        },
+        "method": "以營收重算年增率，並與 MOPS 公布的年增率交叉比對（獨立比對，容差見 config）"
+      },
+      "verificationStatus": "verified"
+    },
+    {
+      "id": "ev-010",
+      "stockId": "2408",
+      "metric": "operatingMargin",
+      "claim": "2026Q2 單季營業利益率 73.7%",
+      "value": 73.685,
+      "unit": "%",
+      "dataset": "quarterly_financials",
+      "source": "MOPS",
+      "sourceUrl": "https://mopsov.twse.com.tw/mops/web/ajax_t163sb04",
+      "referenceUrl": null,
+      "dataAsOf": "2026Q2",
+      "windowStart": "2026Q2",
+      "windowEnd": "2026Q2",
+      "fetchedAt": "2026-10-10T08:52:55+08:00",
+      "fetchedAtScope": "row",
+      "calculation": {
+        "formula": "operating_income_quarter / revenue_quarter",
+        "inputs": {
+          "amountUnit": "TWD thousand",
+          "availabilityCutoff": "2026-08-31",
+          "differencePp": 0.0,
+          "operatingIncomeQuarter": 60826277,
+          "quarter": "2026Q2",
+          "revenueQuarter": 82549073,
+          "sourceOperatingMarginQuarter": 73.68499098711865
+        },
+        "method": "以 MOPS 財報的單季營業利益與單季營收重算，確認輸入完整且與資料表內推導值一致；此指標沒有第二個獨立來源可比對"
+      },
+      "verificationStatus": "verified"
+    },
+    {
+      "id": "ev-011",
+      "stockId": "2408",
+      "metric": "debtRatio",
+      "claim": "2026Q2 負債比 16.8%",
+      "value": 16.7784,
+      "unit": "%",
+      "dataset": "quarterly_financials",
+      "source": "MOPS",
+      "sourceUrl": "https://mopsov.twse.com.tw/mops/web/ajax_t163sb05",
+      "referenceUrl": null,
+      "dataAsOf": "2026Q2",
+      "windowStart": "2026Q2",
+      "windowEnd": "2026Q2",
+      "fetchedAt": "2026-10-10T08:52:55+08:00",
+      "fetchedAtScope": "row",
+      "calculation": {
+        "formula": "total_liabilities / total_assets",
+        "inputs": {
+          "amountUnit": "TWD thousand",
+          "availabilityCutoff": "2026-08-31",
+          "differencePp": 0.0,
+          "quarter": "2026Q2",
+          "sourceDebtRatio": 16.778415948685712,
+          "totalAssets": 387758196,
+          "totalLiabilities": 65059683
+        },
+        "method": "以 MOPS 資產負債表的總負債與總資產重算，確認輸入完整且與資料表內推導值一致；此指標沒有第二個獨立來源可比對"
+      },
+      "verificationStatus": "verified"
+    },
+    {
+      "id": "ev-012",
+      "stockId": "2408",
+      "metric": "avgTurnover20d",
+      "claim": "近 20 個交易日（2026-09-09 至 2026-10-08）日均成交金額 220.5 億元",
+      "value": 22051025879.95,
+      "unit": "TWD",
+      "dataset": "daily_prices",
+      "source": "TWSE",
+      "sourceUrl": "https://www.twse.com.tw/rwd/zh/afterTrading/MI_INDEX",
+      "referenceUrl": null,
+      "dataAsOf": "2026-10-08",
+      "windowStart": "2026-09-09",
+      "windowEnd": "2026-10-08",
+      "fetchedAt": "2026-10-10T01:12:16+08:00",
+      "fetchedAtScope": "dataset",
+      "calculation": {
+        "formula": "AVG(turnover) over the last N market trading days",
+        "inputs": {
+          "currency": "TWD",
+          "observedDays": 20,
+          "totalTurnover": 441020517599.0,
+          "tradingDays": 20,
+          "windowEnd": "2026-10-08",
+          "windowStart": "2026-09-09"
+        },
+        "method": "窗口內每個市場交易日都必須有該股成交資料"
+      },
+      "verificationStatus": "verified"
+    },
+    {
+      "id": "ev-013",
+      "stockId": "7828",
+      "metric": "revenueYoY",
+      "claim": "2026-08 月營收年增 192.1%",
+      "value": 192.1368,
+      "unit": "%",
+      "dataset": "monthly_revenue",
+      "source": "MOPS",
+      "sourceUrl": "https://mopsov.twse.com.tw/nas/t21/",
+      "referenceUrl": null,
+      "dataAsOf": "2026-08",
+      "windowStart": "2025-08",
+      "windowEnd": "2026-08",
+      "fetchedAt": "2026-10-10T01:12:21+08:00",
+      "fetchedAtScope": "dataset",
+      "calculation": {
+        "formula": "revenue(month) / revenue(same month last year) - 1",
+        "inputs": {
+          "differencePp": 0.0068,
+          "month": "2026-08",
+          "priorYearMonth": "2025-08",
+          "priorYearRevenue": 53757.0,
+          "revenue": 157044.0,
+          "revenueUnit": "TWD thousand",
+          "sourceYoYPct": 192.13
+        },
+        "method": "以營收重算年增率，並與 MOPS 公布的年增率交叉比對（獨立比對，容差見 config）"
+      },
+      "verificationStatus": "verified"
+    },
+    {
+      "id": "ev-014",
+      "stockId": "7828",
+      "metric": "operatingMargin",
+      "claim": "2026Q2 單季營業利益率 45.4%",
+      "value": 45.3613,
+      "unit": "%",
+      "dataset": "quarterly_financials",
+      "source": "MOPS",
+      "sourceUrl": "https://mopsov.twse.com.tw/mops/web/ajax_t163sb04",
+      "referenceUrl": null,
+      "dataAsOf": "2026Q2",
+      "windowStart": "2026Q2",
+      "windowEnd": "2026Q2",
+      "fetchedAt": "2026-10-10T08:53:01+08:00",
+      "fetchedAtScope": "row",
+      "calculation": {
+        "formula": "operating_income_quarter / revenue_quarter",
+        "inputs": {
+          "amountUnit": "TWD thousand",
+          "availabilityCutoff": "2026-08-31",
+          "differencePp": 0.0,
+          "operatingIncomeQuarter": 162931,
+          "quarter": "2026Q2",
+          "revenueQuarter": 359185,
+          "sourceOperatingMarginQuarter": 45.36130406336568
+        },
+        "method": "以 MOPS 財報的單季營業利益與單季營收重算，確認輸入完整且與資料表內推導值一致；此指標沒有第二個獨立來源可比對"
+      },
+      "verificationStatus": "verified"
+    },
+    {
+      "id": "ev-015",
+      "stockId": "7828",
+      "metric": "debtRatio",
+      "claim": "2026Q2 負債比 10.5%",
+      "value": 10.5471,
+      "unit": "%",
+      "dataset": "quarterly_financials",
+      "source": "MOPS",
+      "sourceUrl": "https://mopsov.twse.com.tw/mops/web/ajax_t163sb05",
+      "referenceUrl": null,
+      "dataAsOf": "2026Q2",
+      "windowStart": "2026Q2",
+      "windowEnd": "2026Q2",
+      "fetchedAt": "2026-10-10T08:53:01+08:00",
+      "fetchedAtScope": "row",
+      "calculation": {
+        "formula": "total_liabilities / total_assets",
+        "inputs": {
+          "amountUnit": "TWD thousand",
+          "availabilityCutoff": "2026-08-31",
+          "differencePp": 0.0,
+          "quarter": "2026Q2",
+          "sourceDebtRatio": 10.547085692366599,
+          "totalAssets": 5777084,
+          "totalLiabilities": 609314
+        },
+        "method": "以 MOPS 資產負債表的總負債與總資產重算，確認輸入完整且與資料表內推導值一致；此指標沒有第二個獨立來源可比對"
+      },
+      "verificationStatus": "verified"
+    },
+    {
+      "id": "ev-016",
+      "stockId": "7828",
+      "metric": "avgTurnover20d",
+      "claim": "近 20 個交易日（2026-09-09 至 2026-10-08）日均成交金額 5.9 億元",
+      "value": 587396355.0,
+      "unit": "TWD",
+      "dataset": "daily_prices",
+      "source": "TPEx",
+      "sourceUrl": "https://www.tpex.org.tw/www/zh-tw/afterTrading/dailyQuotes",
+      "referenceUrl": null,
+      "dataAsOf": "2026-10-08",
+      "windowStart": "2026-09-09",
+      "windowEnd": "2026-10-08",
+      "fetchedAt": "2026-10-10T01:12:16+08:00",
+      "fetchedAtScope": "dataset",
+      "calculation": {
+        "formula": "AVG(turnover) over the last N market trading days",
+        "inputs": {
+          "currency": "TWD",
+          "observedDays": 20,
+          "totalTurnover": 11747927100.0,
+          "tradingDays": 20,
+          "windowEnd": "2026-10-08",
+          "windowStart": "2026-09-09"
+        },
+        "method": "窗口內每個市場交易日都必須有該股成交資料"
+      },
+      "verificationStatus": "verified"
+    },
+    {
+      "id": "ev-017",
+      "stockId": "3653",
+      "metric": "revenueYoY",
+      "claim": "2026-08 月營收年增 90.9%",
+      "value": 90.9032,
+      "unit": "%",
+      "dataset": "monthly_revenue",
+      "source": "MOPS",
+      "sourceUrl": "https://mopsov.twse.com.tw/nas/t21/",
+      "referenceUrl": null,
+      "dataAsOf": "2026-08",
+      "windowStart": "2025-08",
+      "windowEnd": "2026-08",
+      "fetchedAt": "2026-10-10T01:12:21+08:00",
+      "fetchedAtScope": "dataset",
+      "calculation": {
+        "formula": "revenue(month) / revenue(same month last year) - 1",
+        "inputs": {
+          "differencePp": 0.0032,
+          "month": "2026-08",
+          "priorYearMonth": "2025-08",
+          "priorYearRevenue": 1689803.0,
+          "revenue": 3225888.0,
+          "revenueUnit": "TWD thousand",
+          "sourceYoYPct": 90.9
+        },
+        "method": "以營收重算年增率，並與 MOPS 公布的年增率交叉比對（獨立比對，容差見 config）"
+      },
+      "verificationStatus": "verified"
+    },
+    {
+      "id": "ev-018",
+      "stockId": "3653",
+      "metric": "operatingMargin",
+      "claim": "2026Q2 單季營業利益率 37.8%",
+      "value": 37.792,
+      "unit": "%",
+      "dataset": "quarterly_financials",
+      "source": "MOPS",
+      "sourceUrl": "https://mopsov.twse.com.tw/mops/web/ajax_t163sb04",
+      "referenceUrl": null,
+      "dataAsOf": "2026Q2",
+      "windowStart": "2026Q2",
+      "windowEnd": "2026Q2",
+      "fetchedAt": "2026-10-10T08:52:55+08:00",
+      "fetchedAtScope": "row",
+      "calculation": {
+        "formula": "operating_income_quarter / revenue_quarter",
+        "inputs": {
+          "amountUnit": "TWD thousand",
+          "availabilityCutoff": "2026-08-31",
+          "differencePp": 0.0,
+          "operatingIncomeQuarter": 2749185,
+          "quarter": "2026Q2",
+          "revenueQuarter": 7274516,
+          "sourceOperatingMarginQuarter": 37.7919988078932
+        },
+        "method": "以 MOPS 財報的單季營業利益與單季營收重算，確認輸入完整且與資料表內推導值一致；此指標沒有第二個獨立來源可比對"
+      },
+      "verificationStatus": "verified"
+    },
+    {
+      "id": "ev-019",
+      "stockId": "3653",
+      "metric": "debtRatio",
+      "claim": "2026Q2 負債比 28.7%",
+      "value": 28.6859,
+      "unit": "%",
+      "dataset": "quarterly_financials",
+      "source": "MOPS",
+      "sourceUrl": "https://mopsov.twse.com.tw/mops/web/ajax_t163sb05",
+      "referenceUrl": null,
+      "dataAsOf": "2026Q2",
+      "windowStart": "2026Q2",
+      "windowEnd": "2026Q2",
+      "fetchedAt": "2026-10-10T08:52:55+08:00",
+      "fetchedAtScope": "row",
+      "calculation": {
+        "formula": "total_liabilities / total_assets",
+        "inputs": {
+          "amountUnit": "TWD thousand",
+          "availabilityCutoff": "2026-08-31",
+          "differencePp": 0.0,
+          "quarter": "2026Q2",
+          "sourceDebtRatio": 28.685864532741444,
+          "totalAssets": 33382738,
+          "totalLiabilities": 9576127
+        },
+        "method": "以 MOPS 資產負債表的總負債與總資產重算，確認輸入完整且與資料表內推導值一致；此指標沒有第二個獨立來源可比對"
+      },
+      "verificationStatus": "verified"
+    },
+    {
+      "id": "ev-020",
+      "stockId": "3653",
+      "metric": "avgTurnover20d",
+      "claim": "近 20 個交易日（2026-09-09 至 2026-10-08）日均成交金額 77.5 億元",
+      "value": 7753494663.85,
+      "unit": "TWD",
+      "dataset": "daily_prices",
+      "source": "TWSE",
+      "sourceUrl": "https://www.twse.com.tw/rwd/zh/afterTrading/MI_INDEX",
+      "referenceUrl": null,
+      "dataAsOf": "2026-10-08",
+      "windowStart": "2026-09-09",
+      "windowEnd": "2026-10-08",
+      "fetchedAt": "2026-10-10T01:12:16+08:00",
+      "fetchedAtScope": "dataset",
+      "calculation": {
+        "formula": "AVG(turnover) over the last N market trading days",
+        "inputs": {
+          "currency": "TWD",
+          "observedDays": 20,
+          "totalTurnover": 155069893277.0,
+          "tradingDays": 20,
+          "windowEnd": "2026-10-08",
+          "windowStart": "2026-09-09"
+        },
+        "method": "窗口內每個市場交易日都必須有該股成交資料"
+      },
+      "verificationStatus": "verified"
+    },
+    {
+      "id": "ev-021",
+      "stockId": "3081",
+      "metric": "revenueYoY",
+      "claim": "2026-08 月營收年增 180.9%",
+      "value": 180.9019,
+      "unit": "%",
+      "dataset": "monthly_revenue",
+      "source": "MOPS",
+      "sourceUrl": "https://mopsov.twse.com.tw/nas/t21/",
+      "referenceUrl": null,
+      "dataAsOf": "2026-08",
+      "windowStart": "2025-08",
+      "windowEnd": "2026-08",
+      "fetchedAt": "2026-10-10T01:12:21+08:00",
+      "fetchedAtScope": "dataset",
+      "calculation": {
+        "formula": "revenue(month) / revenue(same month last year) - 1",
+        "inputs": {
+          "differencePp": 0.0019,
+          "month": "2026-08",
+          "priorYearMonth": "2025-08",
+          "priorYearRevenue": 185285.0,
+          "revenue": 520469.0,
+          "revenueUnit": "TWD thousand",
+          "sourceYoYPct": 180.9
+        },
+        "method": "以營收重算年增率，並與 MOPS 公布的年增率交叉比對（獨立比對，容差見 config）"
+      },
+      "verificationStatus": "verified"
+    },
+    {
+      "id": "ev-022",
+      "stockId": "3081",
+      "metric": "operatingMargin",
+      "claim": "2026Q2 單季營業利益率 46.9%",
+      "value": 46.8867,
+      "unit": "%",
+      "dataset": "quarterly_financials",
+      "source": "MOPS",
+      "sourceUrl": "https://mopsov.twse.com.tw/mops/web/ajax_t163sb04",
+      "referenceUrl": null,
+      "dataAsOf": "2026Q2",
+      "windowStart": "2026Q2",
+      "windowEnd": "2026Q2",
+      "fetchedAt": "2026-10-10T08:53:01+08:00",
+      "fetchedAtScope": "row",
+      "calculation": {
+        "formula": "operating_income_quarter / revenue_quarter",
+        "inputs": {
+          "amountUnit": "TWD thousand",
+          "availabilityCutoff": "2026-08-31",
+          "differencePp": 0.0,
+          "operatingIncomeQuarter": 572570,
+          "quarter": "2026Q2",
+          "revenueQuarter": 1221178,
+          "sourceOperatingMarginQuarter": 46.8866946505751
+        },
+        "method": "以 MOPS 財報的單季營業利益與單季營收重算，確認輸入完整且與資料表內推導值一致；此指標沒有第二個獨立來源可比對"
+      },
+      "verificationStatus": "verified"
+    },
+    {
+      "id": "ev-023",
+      "stockId": "3081",
+      "metric": "debtRatio",
+      "claim": "2026Q2 負債比 24.1%",
+      "value": 24.1034,
+      "unit": "%",
+      "dataset": "quarterly_financials",
+      "source": "MOPS",
+      "sourceUrl": "https://mopsov.twse.com.tw/mops/web/ajax_t163sb05",
+      "referenceUrl": null,
+      "dataAsOf": "2026Q2",
+      "windowStart": "2026Q2",
+      "windowEnd": "2026Q2",
+      "fetchedAt": "2026-10-10T08:53:01+08:00",
+      "fetchedAtScope": "row",
+      "calculation": {
+        "formula": "total_liabilities / total_assets",
+        "inputs": {
+          "amountUnit": "TWD thousand",
+          "availabilityCutoff": "2026-08-31",
+          "differencePp": 0.0,
+          "quarter": "2026Q2",
+          "sourceDebtRatio": 24.10337586674095,
+          "totalAssets": 6217544,
+          "totalLiabilities": 1498638
+        },
+        "method": "以 MOPS 資產負債表的總負債與總資產重算，確認輸入完整且與資料表內推導值一致；此指標沒有第二個獨立來源可比對"
+      },
+      "verificationStatus": "verified"
+    },
+    {
+      "id": "ev-024",
+      "stockId": "3081",
+      "metric": "avgTurnover20d",
+      "claim": "近 20 個交易日（2026-09-09 至 2026-10-08）日均成交金額 98.4 億元",
+      "value": 9840203100.0,
+      "unit": "TWD",
+      "dataset": "daily_prices",
+      "source": "TPEx",
+      "sourceUrl": "https://www.tpex.org.tw/www/zh-tw/afterTrading/dailyQuotes",
+      "referenceUrl": null,
+      "dataAsOf": "2026-10-08",
+      "windowStart": "2026-09-09",
+      "windowEnd": "2026-10-08",
+      "fetchedAt": "2026-10-10T01:12:16+08:00",
+      "fetchedAtScope": "dataset",
+      "calculation": {
+        "formula": "AVG(turnover) over the last N market trading days",
+        "inputs": {
+          "currency": "TWD",
+          "observedDays": 20,
+          "totalTurnover": 196804062000.0,
+          "tradingDays": 20,
+          "windowEnd": "2026-10-08",
+          "windowStart": "2026-09-09"
+        },
+        "method": "窗口內每個市場交易日都必須有該股成交資料"
+      },
+      "verificationStatus": "verified"
+    },
+    {
+      "id": "ev-025",
+      "stockId": "6426",
+      "metric": "revenueYoY",
+      "claim": "2026-08 月營收年增 78.2%",
+      "value": 78.2087,
+      "unit": "%",
+      "dataset": "monthly_revenue",
+      "source": "MOPS",
+      "sourceUrl": "https://mopsov.twse.com.tw/nas/t21/",
+      "referenceUrl": null,
+      "dataAsOf": "2026-08",
+      "windowStart": "2025-08",
+      "windowEnd": "2026-08",
+      "fetchedAt": "2026-10-10T01:12:21+08:00",
+      "fetchedAtScope": "dataset",
+      "calculation": {
+        "formula": "revenue(month) / revenue(same month last year) - 1",
+        "inputs": {
+          "differencePp": 0.0087,
+          "month": "2026-08",
+          "priorYearMonth": "2025-08",
+          "priorYearRevenue": 41154.0,
+          "revenue": 73340.0,
+          "revenueUnit": "TWD thousand",
+          "sourceYoYPct": 78.2
+        },
+        "method": "以營收重算年增率，並與 MOPS 公布的年增率交叉比對（獨立比對，容差見 config）"
+      },
+      "verificationStatus": "verified"
+    },
+    {
+      "id": "ev-026",
+      "stockId": "6426",
+      "metric": "operatingMargin",
+      "claim": "2026Q2 單季營業利益率 36.1%",
+      "value": 36.1381,
+      "unit": "%",
+      "dataset": "quarterly_financials",
+      "source": "MOPS",
+      "sourceUrl": "https://mopsov.twse.com.tw/mops/web/ajax_t163sb04",
+      "referenceUrl": null,
+      "dataAsOf": "2026Q2",
+      "windowStart": "2026Q2",
+      "windowEnd": "2026Q2",
+      "fetchedAt": "2026-10-10T08:52:55+08:00",
+      "fetchedAtScope": "row",
+      "calculation": {
+        "formula": "operating_income_quarter / revenue_quarter",
+        "inputs": {
+          "amountUnit": "TWD thousand",
+          "availabilityCutoff": "2026-08-31",
+          "differencePp": 0.0,
+          "operatingIncomeQuarter": 75087,
+          "quarter": "2026Q2",
+          "revenueQuarter": 207778,
+          "sourceOperatingMarginQuarter": 36.13808969188268
+        },
+        "method": "以 MOPS 財報的單季營業利益與單季營收重算，確認輸入完整且與資料表內推導值一致；此指標沒有第二個獨立來源可比對"
+      },
+      "verificationStatus": "verified"
+    },
+    {
+      "id": "ev-027",
+      "stockId": "6426",
+      "metric": "debtRatio",
+      "claim": "2026Q2 負債比 10.2%",
+      "value": 10.2253,
+      "unit": "%",
+      "dataset": "quarterly_financials",
+      "source": "MOPS",
+      "sourceUrl": "https://mopsov.twse.com.tw/mops/web/ajax_t163sb05",
+      "referenceUrl": null,
+      "dataAsOf": "2026Q2",
+      "windowStart": "2026Q2",
+      "windowEnd": "2026Q2",
+      "fetchedAt": "2026-10-10T08:52:55+08:00",
+      "fetchedAtScope": "row",
+      "calculation": {
+        "formula": "total_liabilities / total_assets",
+        "inputs": {
+          "amountUnit": "TWD thousand",
+          "availabilityCutoff": "2026-08-31",
+          "differencePp": 0.0,
+          "quarter": "2026Q2",
+          "sourceDebtRatio": 10.225332893460608,
+          "totalAssets": 1112443,
+          "totalLiabilities": 113751
+        },
+        "method": "以 MOPS 資產負債表的總負債與總資產重算，確認輸入完整且與資料表內推導值一致；此指標沒有第二個獨立來源可比對"
+      },
+      "verificationStatus": "verified"
+    },
+    {
+      "id": "ev-028",
+      "stockId": "6426",
+      "metric": "avgTurnover20d",
+      "claim": "近 20 個交易日（2026-09-09 至 2026-10-08）日均成交金額 12.6 億元",
+      "value": 1257437979.5,
+      "unit": "TWD",
+      "dataset": "daily_prices",
+      "source": "TWSE",
+      "sourceUrl": "https://www.twse.com.tw/rwd/zh/afterTrading/MI_INDEX",
+      "referenceUrl": null,
+      "dataAsOf": "2026-10-08",
+      "windowStart": "2026-09-09",
+      "windowEnd": "2026-10-08",
+      "fetchedAt": "2026-10-10T01:12:16+08:00",
+      "fetchedAtScope": "dataset",
+      "calculation": {
+        "formula": "AVG(turnover) over the last N market trading days",
+        "inputs": {
+          "currency": "TWD",
+          "observedDays": 20,
+          "totalTurnover": 25148759590.0,
+          "tradingDays": 20,
+          "windowEnd": "2026-10-08",
+          "windowStart": "2026-09-09"
+        },
+        "method": "窗口內每個市場交易日都必須有該股成交資料"
+      },
+      "verificationStatus": "verified"
+    },
+    {
+      "id": "ev-029",
+      "stockId": "6446",
+      "metric": "revenueYoY",
+      "claim": "2026-08 月營收年增 105.4%",
+      "value": 105.4275,
+      "unit": "%",
+      "dataset": "monthly_revenue",
+      "source": "MOPS",
+      "sourceUrl": "https://mopsov.twse.com.tw/nas/t21/",
+      "referenceUrl": null,
+      "dataAsOf": "2026-08",
+      "windowStart": "2025-08",
+      "windowEnd": "2026-08",
+      "fetchedAt": "2026-10-10T01:12:21+08:00",
+      "fetchedAtScope": "dataset",
+      "calculation": {
+        "formula": "revenue(month) / revenue(same month last year) - 1",
+        "inputs": {
+          "differencePp": 0.0075,
+          "month": "2026-08",
+          "priorYearMonth": "2025-08",
+          "priorYearRevenue": 1274036.0,
+          "revenue": 2617220.0,
+          "revenueUnit": "TWD thousand",
+          "sourceYoYPct": 105.42
+        },
+        "method": "以營收重算年增率，並與 MOPS 公布的年增率交叉比對（獨立比對，容差見 config）"
+      },
+      "verificationStatus": "verified"
+    },
+    {
+      "id": "ev-030",
+      "stockId": "6446",
+      "metric": "operatingMargin",
+      "claim": "2026Q2 單季營業利益率 46.0%",
+      "value": 46.0279,
+      "unit": "%",
+      "dataset": "quarterly_financials",
+      "source": "MOPS",
+      "sourceUrl": "https://mopsov.twse.com.tw/mops/web/ajax_t163sb04",
+      "referenceUrl": null,
+      "dataAsOf": "2026Q2",
+      "windowStart": "2026Q2",
+      "windowEnd": "2026Q2",
+      "fetchedAt": "2026-10-10T08:52:55+08:00",
+      "fetchedAtScope": "row",
+      "calculation": {
+        "formula": "operating_income_quarter / revenue_quarter",
+        "inputs": {
+          "amountUnit": "TWD thousand",
+          "availabilityCutoff": "2026-08-31",
+          "differencePp": 0.0,
+          "operatingIncomeQuarter": 3155413,
+          "quarter": "2026Q2",
+          "revenueQuarter": 6855431,
+          "sourceOperatingMarginQuarter": 46.02793026434078
+        },
+        "method": "以 MOPS 財報的單季營業利益與單季營收重算，確認輸入完整且與資料表內推導值一致；此指標沒有第二個獨立來源可比對"
+      },
+      "verificationStatus": "verified"
+    },
+    {
+      "id": "ev-031",
+      "stockId": "6446",
+      "metric": "debtRatio",
+      "claim": "2026Q2 負債比 16.5%",
+      "value": 16.5376,
+      "unit": "%",
+      "dataset": "quarterly_financials",
+      "source": "MOPS",
+      "sourceUrl": "https://mopsov.twse.com.tw/mops/web/ajax_t163sb05",
+      "referenceUrl": null,
+      "dataAsOf": "2026Q2",
+      "windowStart": "2026Q2",
+      "windowEnd": "2026Q2",
+      "fetchedAt": "2026-10-10T08:52:55+08:00",
+      "fetchedAtScope": "row",
+      "calculation": {
+        "formula": "total_liabilities / total_assets",
+        "inputs": {
+          "amountUnit": "TWD thousand",
+          "availabilityCutoff": "2026-08-31",
+          "differencePp": 0.0,
+          "quarter": "2026Q2",
+          "sourceDebtRatio": 16.5375710044656,
+          "totalAssets": 44110958,
+          "totalLiabilities": 7294881
+        },
+        "method": "以 MOPS 資產負債表的總負債與總資產重算，確認輸入完整且與資料表內推導值一致；此指標沒有第二個獨立來源可比對"
+      },
+      "verificationStatus": "verified"
+    },
+    {
+      "id": "ev-032",
+      "stockId": "6446",
+      "metric": "avgTurnover20d",
+      "claim": "近 20 個交易日（2026-09-09 至 2026-10-08）日均成交金額 36.2 億元",
+      "value": 3622542734.5,
+      "unit": "TWD",
+      "dataset": "daily_prices",
+      "source": "TWSE",
+      "sourceUrl": "https://www.twse.com.tw/rwd/zh/afterTrading/MI_INDEX",
+      "referenceUrl": null,
+      "dataAsOf": "2026-10-08",
+      "windowStart": "2026-09-09",
+      "windowEnd": "2026-10-08",
+      "fetchedAt": "2026-10-10T01:12:16+08:00",
+      "fetchedAtScope": "dataset",
+      "calculation": {
+        "formula": "AVG(turnover) over the last N market trading days",
+        "inputs": {
+          "currency": "TWD",
+          "observedDays": 20,
+          "totalTurnover": 72450854690.0,
+          "tradingDays": 20,
+          "windowEnd": "2026-10-08",
+          "windowStart": "2026-09-09"
+        },
+        "method": "窗口內每個市場交易日都必須有該股成交資料"
+      },
+      "verificationStatus": "verified"
+    }
+  ],
+  "excluded": {
+    "total": 1966,
+    "byStage": {
+      "base": 755,
+      "constraint": 1211
+    },
+    "byReason": {
+      "active_disposition": 18,
+      "conflict:revenue_yoy": 6,
+      "inactive": 406,
+      "insufficient:revenue_yoy": 135,
+      "min_liquidity": 1193,
+      "missing_financials": 13,
+      "not_general_statement": 42,
+      "partial:avg_turnover_20d": 148,
+      "partial:operating_margin": 5
+    }
+  }
+}
