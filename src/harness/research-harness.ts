@@ -23,6 +23,7 @@ import {
 import { evaluatePublicationGate } from "./publication-gate.js";
 import { enforceControllerPolicy } from "./controller-policy.js";
 import { assessSourceFreshness } from "../evidence/freshness.js";
+import { hydrateUpstreamEvidence } from "../evidence/upstream-evidence.js";
 
 export interface ResearchHarnessServices {
   verificationPipeline?: VerificationPipeline;
@@ -31,13 +32,15 @@ export interface ResearchHarnessServices {
 }
 
 function initializeResearchState(candidate: CandidatePacket): ResearchState {
+  const upstream = hydrateUpstreamEvidence(candidate);
+
   return {
     runId: randomUUID(),
     candidate,
     phase: "DISCOVERY",
-    knownFacts: [],
-    openQuestions: [],
-    sources: [],
+    knownFacts: upstream.knownFacts,
+    openQuestions: upstream.openQuestions,
+    sources: upstream.sources,
     claims: [],
     evidence: [],
     risks: [],
@@ -47,7 +50,7 @@ function initializeResearchState(candidate: CandidatePacket): ResearchState {
       startedAt: new Date().toISOString(),
     },
     researchTrace: [],
-    evidenceDirty: false,
+    evidenceDirty: upstream.sources.length > 0,
     diagnostics: [],
     invalidationConditions: [],
   };
