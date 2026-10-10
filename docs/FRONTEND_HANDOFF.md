@@ -38,6 +38,14 @@ No Gemini/OpenAI key is needed.
 
 All mock research text is explicitly prefixed with `[MOCK]`.
 
+A real A-shaped sample is already in the repository:
+
+```text
+packages/taiwan_data/tests/fixtures/sample_screening_output.json
+```
+
+C can use that JSON as the `screeningOutput` request body while building the Top-5 / evidence UI.
+
 ### Mode 2 — real Gemini-backed B
 
 When C wants to verify real integration:
