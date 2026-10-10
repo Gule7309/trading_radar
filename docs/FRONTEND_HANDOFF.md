@@ -149,6 +149,7 @@ Use:
 - `decision`
 - `keyReasons`
 - `risks`
+- `risks[].addressesRiskFlags` when A supplied `notice` / `disposition`
 - `verificationSummary.freshness`
 
 Do not present `score`, `quantScore`, or `evidenceQuality` as a probability that price will rise.
@@ -193,6 +194,8 @@ Useful labels:
 - `CONFLICTING` -> 來源衝突
 
 Do not hide rejected results. A rejection such as `INSUFFICIENT_EVIDENCE` is a valid trustworthy-agent outcome.
+
+If A supplied a `notice` or `disposition` flag, B's publication gate will not publish until a grounded risk explicitly marks that flag as addressed.
 
 ### Research timeline
 
