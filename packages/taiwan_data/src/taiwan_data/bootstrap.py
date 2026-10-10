@@ -215,6 +215,7 @@ def refresh_manifest(
         "database": db_path.name,
         "database_bytes": db_path.stat().st_size,
         "sha256": _sha256(db_path),
+        "data_version": DataStore(db_path).data_version(),
         "status": DataStore(db_path).status(),
     })
     artifact_rows = []

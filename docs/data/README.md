@@ -10,7 +10,7 @@ packages/taiwan_data/        套件原始碼與測試
 scripts/windows/             本機每日排程（Windows 工作排程器）
 var/data/taiwan_stock.sqlite 資料庫（不進 Git，約 1 GB）
 var/logs/                    排程與手動更新紀錄（不進 Git）
-docs/data/                   本文件、回補評估、上雲規劃
+docs/data/                   本文件、回補評估、上雲規劃、screening 規格（screening.md）
 ```
 
 ## 本機建置

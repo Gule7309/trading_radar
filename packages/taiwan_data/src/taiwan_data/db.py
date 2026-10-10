@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import re
@@ -14,6 +15,18 @@ from zoneinfo import ZoneInfo
 TAIPEI = ZoneInfo("Asia/Taipei")
 DEFAULT_DB_ENV = "TAIWAN_DATA_DB"
 _IDENTIFIER = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
+
+
+def dataset_status_digest(conn: sqlite3.Connection) -> str:
+    digest = hashlib.sha256()
+    try:
+        rows = conn.execute(
+            "SELECT dataset, as_of_value, fetched_at, row_count, status FROM dataset_status ORDER BY dataset")
+        for row in rows:
+            digest.update("|".join(str(v) for v in tuple(row)).encode("utf-8") + b"\n")
+    except sqlite3.OperationalError:  # 尚未建立 dataset_status
+        pass
+    return "ds-" + digest.hexdigest()[:16]
 
 
 def now_iso() -> str:
@@ -73,6 +86,11 @@ class DataStore:
         for name, sql_type in definitions.items():
             if name not in existing:
                 conn.execute(f"ALTER TABLE [{table}] ADD COLUMN [{name}] {sql_type}")
+
+    def data_version(self) -> str:
+        """dataset_status 的摘要，用來辨識「目前是哪一版資料」，不必對整個 SQLite 重新雜湊。"""
+        with closing(self.connect()) as conn:
+            return dataset_status_digest(conn)
 
     def scalar(self, sql: str, params: Sequence[object] = ()):
         with closing(self.connect()) as conn:
