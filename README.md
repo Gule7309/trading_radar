@@ -1,73 +1,90 @@
 # trading_radar
 
-股研雷達（Trading Radar）— Agentic AI 台股研究助理。
+股研雷達（Trading Radar）— evidence-centered Agentic AI 台股研究助理。
 
-目前主要開發 B 模組（Agent / Evidence）：把 A 模組提供的候選股轉成可追溯、可驗證、帶風險與失效條件的研究結果，再交給 C 模組呈現。
+This branch implements the **B module: Agent / Evidence**.
 
-## B MVP
+## What the MVP does
 
 ```text
-CandidatePacket
-  -> Research Controller
-  -> Official data / grounded web search
-  -> ResearchState
-  -> Atomic claims
-  -> Evidence verification
-  -> Risk extraction
-  -> Publication gate
-  -> ResearchResult
-  -> Versioned thesis tracking
+A candidate stocks
+→ bounded evidence-seeking research
+→ official + dynamic sources
+→ atomic claims
+→ verification / conflicts / risks
+→ deterministic publication gate
+→ Top-K results
+→ versioned investment thesis tracking
 ```
 
-目前已包含：
+It does **not** predict guaranteed returns or auto-trade.
 
-- TWSE / TPEx 月營收與重大訊息 adapter
-- Gemini structured-output controller / extractor / verifier / skeptic / thesis compiler
-- Gemini Google Search grounding adapter
-- guarded full-page source fetch
-- deterministic publication gate
-- retry / fallback-aware harness
-- claim/evidence/conflict/risk pipeline
-- SQLite thesis history
-- E01–E10 reliability scenario catalog
+## Quick start
 
-## Local setup
-
-Requires Node.js 22+.
+Node.js 22+.
 
 ```bash
 npm install
 cp .env.example .env
 ```
 
-Set `GEMINI_API_KEY` locally. Never commit the real key.
+Set your local Gemini key in `.env`:
 
-Mock demo:
-
-```bash
-npm run demo
+```env
+GEMINI_API_KEY=...
 ```
 
-Official-data smoke test:
+Never commit the real key.
+
+### Static checks
+
+```bash
+npm run typecheck
+npm test
+npm run eval:offline
+```
+
+### Official-data smoke test
 
 ```bash
 npm run demo:official -- 2330 TWSE
 ```
 
-Gemini API smoke test:
+### Gemini smoke test
 
 ```bash
-set GEMINI_API_KEY=YOUR_KEY
 npm run demo:gemini:smoke
 ```
 
-Live Gemini research path:
+### Live single-stock research
 
 ```bash
-set GEMINI_API_KEY=YOUR_KEY
 npm run demo:gemini -- 2330 台積電 TWSE 半導體業
 ```
 
-On macOS/Linux, use `export GEMINI_API_KEY=...` instead.
+### Local integration API
 
-See `docs/B_AGENT_MVP.md` for architecture and design rationale.
+```bash
+npm run api
+```
+
+Default: `http://127.0.0.1:8787`.
+
+## Main endpoints
+
+- `POST /api/research/runs`
+- `POST /api/research/batch`
+- `GET /api/research/runs/:runId`
+- `POST /api/theses`
+- `POST /api/theses/:thesisId/recheck`
+- `GET /api/theses/:thesisId/versions`
+- `GET /api/theses/:thesisId/events`
+
+## Provider strategy
+
+The research runtime is provider-neutral. Gemini is used for current development; a later OpenAI adapter can replace it without changing the research harness or product contracts.
+
+## Docs
+
+- `docs/B_AGENT_MVP.md` — architecture, policies, status, DoD
+- `docs/INTEGRATION.md` — A/B/C contracts and API usage
