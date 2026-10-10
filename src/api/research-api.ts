@@ -5,6 +5,10 @@ import type { CandidatePacket } from "../domain/candidate.js";
 import type { ResearchResult } from "../domain/research.js";
 import type { StoredResearchRun } from "../research/store.js";
 import type {
+  BatchResearchOptions,
+  BatchResearchResult,
+} from "../research/batch-service.js";
+import type {
   ThesisEvent,
   ThesisVersion,
 } from "../thesis/types.js";
@@ -16,6 +20,13 @@ export interface ResearchApiService {
     ticker: string,
     limit?: number,
   ): Promise<StoredResearchRun[]>;
+}
+
+export interface BatchResearchApiService {
+  run(
+    candidates: CandidatePacket[],
+    options?: BatchResearchOptions,
+  ): Promise<BatchResearchResult>;
 }
 
 export interface ThesisApiService {
@@ -37,6 +48,7 @@ export interface ApiOptions {
   corsOrigin?: string;
   maxBodyBytes?: number;
   theses?: ThesisApiService;
+  batch?: BatchResearchApiService;
 }
 
 function json(
@@ -119,6 +131,7 @@ export function createResearchApi(
   const corsOrigin = options.corsOrigin ?? "http://localhost:5173";
   const maxBodyBytes = options.maxBodyBytes ?? 1_000_000;
   const theses = options.theses;
+  const batch = options.batch;
 
   return createServer(async (request, response) => {
     if (!request.url || !request.method) {
@@ -145,9 +158,55 @@ export function createResearchApi(
             ok: true,
             service: "trading-radar-b",
             thesisTracking: Boolean(theses),
+            batchResearch: Boolean(batch),
           },
           corsOrigin,
         );
+      }
+
+      if (request.method === "POST" && url.pathname === "/api/research/batch") {
+        if (!batch) {
+          return json(response, 501, { error: "BATCH_API_DISABLED" }, corsOrigin);
+        }
+
+        const body = await readJsonBody(request, maxBodyBytes);
+        if (
+          typeof body !== "object" ||
+          body === null ||
+          !Array.isArray((body as { candidates?: unknown }).candidates)
+        ) {
+          return json(
+            response,
+            400,
+            { error: "INVALID_BATCH_REQUEST" },
+            corsOrigin,
+          );
+        }
+
+        const record = body as {
+          candidates: unknown[];
+          options?: BatchResearchOptions;
+        };
+        const candidates: CandidatePacket[] = [];
+
+        for (const item of record.candidates) {
+          const parsed = CandidatePacketSchema.safeParse(item);
+          if (!parsed.success) {
+            return json(
+              response,
+              400,
+              {
+                error: "INVALID_CANDIDATE_PACKET",
+                issues: parsed.error.issues,
+              },
+              corsOrigin,
+            );
+          }
+          candidates.push(parsed.data);
+        }
+
+        const result = await batch.run(candidates, record.options);
+        return json(response, 200, result, corsOrigin);
       }
 
       if (request.method === "POST" && url.pathname === "/api/research/runs") {
