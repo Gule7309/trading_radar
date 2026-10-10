@@ -4,6 +4,10 @@ import { CandidatePacketSchema } from "../domain/candidate.js";
 import type { CandidatePacket } from "../domain/candidate.js";
 import type { ResearchResult } from "../domain/research.js";
 import type { StoredResearchRun } from "../research/store.js";
+import type {
+  ThesisEvent,
+  ThesisVersion,
+} from "../thesis/types.js";
 
 export interface ResearchApiService {
   run(candidate: CandidatePacket): Promise<ResearchResult>;
@@ -14,9 +18,25 @@ export interface ResearchApiService {
   ): Promise<StoredResearchRun[]>;
 }
 
+export interface ThesisApiService {
+  create(
+    candidate: CandidatePacket,
+    thesisId?: string,
+  ): Promise<{ researchRunId: string; thesis: ThesisVersion }>;
+  recheck(
+    thesisId: string,
+    candidate: CandidatePacket,
+    eventType?: ThesisEvent["eventType"],
+  ): Promise<{ researchRunId: string; thesis: ThesisVersion }>;
+  getLatest(thesisId: string): Promise<ThesisVersion | null>;
+  listVersions(thesisId: string): Promise<ThesisVersion[]>;
+  listEvents(thesisId: string): Promise<ThesisEvent[]>;
+}
+
 export interface ApiOptions {
   corsOrigin?: string;
   maxBodyBytes?: number;
+  theses?: ThesisApiService;
 }
 
 function json(
@@ -61,12 +81,44 @@ async function readJsonBody(
   }
 }
 
+function parseCandidatePayload(
+  value: unknown,
+): { candidate: CandidatePacket; thesisId?: string; eventType?: ThesisEvent["eventType"] } {
+  if (typeof value !== "object" || value === null) {
+    throw new Error("INVALID_CANDIDATE_PACKET");
+  }
+
+  const record = value as Record<string, unknown>;
+  const candidateInput =
+    "candidate" in record ? record.candidate : value;
+  const parsed = CandidatePacketSchema.safeParse(candidateInput);
+
+  if (!parsed.success) {
+    const error = new Error("INVALID_CANDIDATE_PACKET") as Error & {
+      issues?: unknown;
+    };
+    error.issues = parsed.error.issues;
+    throw error;
+  }
+
+  return {
+    candidate: parsed.data,
+    thesisId:
+      typeof record.thesisId === "string" ? record.thesisId : undefined,
+    eventType:
+      typeof record.eventType === "string"
+        ? (record.eventType as ThesisEvent["eventType"])
+        : undefined,
+  };
+}
+
 export function createResearchApi(
   service: ResearchApiService,
   options: ApiOptions = {},
 ) {
   const corsOrigin = options.corsOrigin ?? "http://localhost:5173";
   const maxBodyBytes = options.maxBodyBytes ?? 1_000_000;
+  const theses = options.theses;
 
   return createServer(async (request, response) => {
     if (!request.url || !request.method) {
@@ -89,7 +141,11 @@ export function createResearchApi(
         return json(
           response,
           200,
-          { ok: true, service: "trading-radar-b" },
+          {
+            ok: true,
+            service: "trading-radar-b",
+            thesisTracking: Boolean(theses),
+          },
           corsOrigin,
         );
       }
@@ -112,6 +168,86 @@ export function createResearchApi(
 
         const result = await service.run(parsed.data);
         return json(response, 200, result, corsOrigin);
+      }
+
+      if (request.method === "POST" && url.pathname === "/api/theses") {
+        if (!theses) {
+          return json(response, 501, { error: "THESIS_API_DISABLED" }, corsOrigin);
+        }
+
+        const body = await readJsonBody(request, maxBodyBytes);
+        const parsed = parseCandidatePayload(body);
+        const result = await theses.create(parsed.candidate, parsed.thesisId);
+        return json(response, 200, result, corsOrigin);
+      }
+
+      const recheckMatch = url.pathname.match(
+        /^\/api\/theses\/([^/]+)\/recheck$/,
+      );
+      if (request.method === "POST" && recheckMatch) {
+        if (!theses) {
+          return json(response, 501, { error: "THESIS_API_DISABLED" }, corsOrigin);
+        }
+
+        const body = await readJsonBody(request, maxBodyBytes);
+        const parsed = parseCandidatePayload(body);
+        const thesisId = decodeURIComponent(recheckMatch[1] ?? "");
+        const result = await theses.recheck(
+          thesisId,
+          parsed.candidate,
+          parsed.eventType,
+        );
+        return json(response, 200, result, corsOrigin);
+      }
+
+      const thesisMatch = url.pathname.match(/^\/api\/theses\/([^/]+)$/);
+      if (request.method === "GET" && thesisMatch) {
+        if (!theses) {
+          return json(response, 501, { error: "THESIS_API_DISABLED" }, corsOrigin);
+        }
+
+        const thesisId = decodeURIComponent(thesisMatch[1] ?? "");
+        const thesis = await theses.getLatest(thesisId);
+
+        if (!thesis) {
+          return json(response, 404, { error: "THESIS_NOT_FOUND" }, corsOrigin);
+        }
+
+        return json(response, 200, thesis, corsOrigin);
+      }
+
+      const versionsMatch = url.pathname.match(
+        /^\/api\/theses\/([^/]+)\/versions$/,
+      );
+      if (request.method === "GET" && versionsMatch) {
+        if (!theses) {
+          return json(response, 501, { error: "THESIS_API_DISABLED" }, corsOrigin);
+        }
+
+        const thesisId = decodeURIComponent(versionsMatch[1] ?? "");
+        return json(
+          response,
+          200,
+          { thesisId, versions: await theses.listVersions(thesisId) },
+          corsOrigin,
+        );
+      }
+
+      const eventsMatch = url.pathname.match(
+        /^\/api\/theses\/([^/]+)\/events$/,
+      );
+      if (request.method === "GET" && eventsMatch) {
+        if (!theses) {
+          return json(response, 501, { error: "THESIS_API_DISABLED" }, corsOrigin);
+        }
+
+        const thesisId = decodeURIComponent(eventsMatch[1] ?? "");
+        return json(
+          response,
+          200,
+          { thesisId, events: await theses.listEvents(thesisId) },
+          corsOrigin,
+        );
       }
 
       const runMatch = url.pathname.match(/^\/api\/research\/runs\/([^/]+)$/);
@@ -146,7 +282,8 @@ export function createResearchApi(
       const status =
         message === "REQUEST_BODY_TOO_LARGE"
           ? 413
-          : message === "INVALID_JSON"
+          : message === "INVALID_JSON" ||
+              message === "INVALID_CANDIDATE_PACKET"
             ? 400
             : 500;
 
@@ -155,7 +292,12 @@ export function createResearchApi(
         status,
         {
           error: status === 500 ? "INTERNAL_ERROR" : message,
-          message: status === 500 ? undefined : message,
+          issues:
+            error &&
+            typeof error === "object" &&
+            "issues" in error
+              ? (error as { issues?: unknown }).issues
+              : undefined,
         },
         corsOrigin,
       );
