@@ -5,10 +5,12 @@ import json
 import os
 import sys
 from datetime import date
+from pathlib import Path
 
 from .bootstrap import build_snapshot, refresh_manifest
 from .db import DEFAULT_DB_ENV, DataStore
 from .distribution import DEFAULT_SOURCE, KINDS, create_snapshot, download_snapshot
+from .screening import Profile, ScreeningConfig, get_candidates
 from .service import BACKFILL_START, RefreshService
 
 REFRESH_TARGETS = ("all", "market", "stocks", "revenue", "financials", "margin",
@@ -61,6 +63,20 @@ def build_parser() -> argparse.ArgumentParser:
     manifest.add_argument("--out")
     manifest.add_argument("--artifact", action="append", default=[])
 
+    screen = sub.add_parser("screen", help="執行 screening，輸出 Candidate + Evidence JSON")
+    screen.add_argument("--db", default=os.getenv(DEFAULT_DB_ENV))
+    screen.add_argument("--limit", type=int, default=20)
+    screen.add_argument("--output", help="輸出 JSON 路徑；省略則印到 stdout")
+    screen.add_argument("--as-of", type=_date, help="預設為今天（Asia/Taipei）")
+    screen.add_argument("--profile", help="Profile JSON 檔（camelCase）")
+    screen.add_argument("--config", help="Config JSON 檔（覆寫系統參數）")
+    screen.add_argument("--exclude-industry", action="append", default=[], metavar="INDUSTRY")
+    screen.add_argument("--max-debt-ratio", type=float)
+    screen.add_argument("--min-liquidity", type=float, help="20 日平均成交金額下限（新台幣元）")
+    screen.add_argument("--include-disposition", action="store_true",
+                        help="不排除處置中股票（預設排除）")
+    screen.add_argument("--no-reuse", action="store_true", help="即使輸入相同也建立新的 run")
+
     snapshot = sub.add_parser("snapshot", help="建立可分發的壓縮快照（full 或 demo）與 manifest")
     snapshot.add_argument("--db", default=os.getenv(DEFAULT_DB_ENV))
     snapshot.add_argument("--out-dir", required=True)
@@ -94,6 +110,18 @@ def main(argv: list[str] | None = None) -> None:
         if not args.db:
             raise ValueError(f"請用 --db 或 {DEFAULT_DB_ENV} 指定 SQLite 路徑")
         result = refresh_manifest(args.db, args.out, args.artifact)
+    elif args.command == "screen":
+        result = _screen(args)
+        if args.output is None:
+            print(json.dumps(result, ensure_ascii=False, indent=2))
+            return
+        path = Path(args.output)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps(result, ensure_ascii=False, indent=2), encoding="utf-8")
+        run = result["run"]
+        result = {"output": str(path.resolve()), "runId": run["runId"], "asOfDate": run["asOfDate"],
+                  "revenueAsOf": run["revenueAsOf"], "financialAsOf": run["financialAsOf"],
+                  "candidates": len(result["candidates"]), "evidence": len(result["evidence"])}
     elif args.command == "snapshot":
         result = create_snapshot(args.db, args.out_dir, kind=args.kind, version=args.version)
     elif args.command == "download":
@@ -108,6 +136,25 @@ def main(argv: list[str] | None = None) -> None:
     print(json.dumps(result, ensure_ascii=False, indent=2, default=str))
     if _result_failed(result):
         sys.exit(1)
+
+
+def _screen(args: argparse.Namespace) -> dict[str, object]:
+    if not args.db:
+        raise ValueError(f"請用 --db 或 {DEFAULT_DB_ENV} 指定 SQLite 路徑")
+    profile_data = json.loads(Path(args.profile).read_text(encoding="utf-8")) if args.profile else {}
+    if args.exclude_industry:
+        profile_data["excludedIndustries"] = [*profile_data.get("excludedIndustries", []),
+                                              *args.exclude_industry]
+    if args.max_debt_ratio is not None:
+        profile_data["maxDebtRatio"] = args.max_debt_ratio
+    if args.min_liquidity is not None:
+        profile_data["minLiquidity"] = args.min_liquidity
+    if args.include_disposition:
+        profile_data["excludeDisposition"] = False
+    config_data = json.loads(Path(args.config).read_text(encoding="utf-8")) if args.config else {}
+    return get_candidates(
+        DataStore(args.db), Profile.from_dict(profile_data), as_of_date=args.as_of, limit=args.limit,
+        config=ScreeningConfig.from_dict(config_data), reuse=not args.no_reuse)
 
 
 def _result_failed(result: object) -> bool:

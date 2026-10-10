@@ -16,7 +16,7 @@ dependencies = [
 
 [project.optional-dependencies]
 bootstrap = ["pyarrow>=15"]
-test = ["pytest>=8", "pyarrow>=15"]
+test = ["pytest>=8", "pyarrow>=15", "jsonschema>=4.20"]
 
 [project.scripts]
 taiwan-data = "taiwan_data.cli:main"
@@ -29,7 +29,7 @@ include-package-data = true
 where = ["src"]
 
 [tool.setuptools.package-data]
-taiwan_data = ["schema.sql"]
+taiwan_data = ["schema.sql", "screening/*.json"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
