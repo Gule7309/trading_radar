@@ -247,6 +247,7 @@ function compileResult(
       title: risk.title,
       explanation: risk.explanation,
       sourceIds: risk.sourceIds,
+      addressesRiskFlags: risk.addressesRiskFlags,
     })),
     invalidationConditions: state.invalidationConditions,
     sources: state.sources.map((source) => ({
@@ -527,7 +528,8 @@ export async function researchCandidate(
         (gate.reason === "CORE_CLAIM_DISCOVERY_ONLY" ||
           gate.reason === "FINANCIAL_CORE_WITHOUT_PRIMARY" ||
           gate.reason === "RISK_DISCOVERY_ONLY" ||
-          gate.reason === "NO_RISK_IDENTIFIED") &&
+          gate.reason === "NO_RISK_IDENTIFIED" ||
+          gate.reason === "UPSTREAM_RISK_FLAG_UNADDRESSED") &&
         !isBudgetExceeded(state)
       ) {
         state.openQuestions.push({
@@ -538,7 +540,9 @@ export async function researchCandidate(
               ? "Find a Tier-1 official source for the financial core claim."
               : gate.reason === "NO_RISK_IDENTIFIED"
                 ? "Find a current company-specific downside risk source, fetch it, and verify again."
-                : "Fetch the underlying web source so discovery-only evidence becomes directly inspectable.",
+                : gate.reason === "UPSTREAM_RISK_FLAG_UNADDRESSED"
+                  ? "Investigate every upstream notice/disposition risk flag with official or directly fetched current evidence, then verify again."
+                  : "Fetch the underlying web source so discovery-only evidence becomes directly inspectable.",
           status: "OPEN",
         });
         state.phase = "RESEARCH";
