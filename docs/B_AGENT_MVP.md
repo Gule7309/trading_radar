@@ -2,7 +2,7 @@
 
 ## 1. Goal
 
-B turns an upstream `CandidatePacket` into evidence-grounded stock research that C can render and monitor.
+B turns Data Layer `screening-output-v1` (or an internal `CandidatePacket`) into evidence-grounded stock research that C can render and monitor.
 
 The MVP is not a price predictor and does not auto-trade. It is an evidence-seeking research system with explicit stop conditions, verification, risks, and thesis invalidation rules.
 
@@ -13,7 +13,12 @@ Core product rule:
 ## 2. Current architecture
 
 ```text
-A CandidatePacket
+A screening-output-v1
+  Candidate + verified quantitative Evidence + riskFlags
+      ↓
+ScreeningOutput adapter
+      ↓
+CandidatePacket + upstream evidence lineage
       ↓
 BatchResearchService (optional 20–30 candidate entry)
       ↓
@@ -181,6 +186,11 @@ Currently mapped:
 - `revenue_mom`
 - `monthly_revenue`
 - `cumulative_revenue_yoy`
+- `operating_margin`
+- `debt_ratio`
+- `avg_turnover_20d`
+
+When PR #5 screening evidence is present, B reuses that verified quantitative evidence and does not repeat the same monthly-revenue lookup.
 
 Percentage signals support both ratio form (`0.35`) and percent form (`35`).
 
@@ -290,6 +300,7 @@ http://127.0.0.1:8787
 
 Research:
 
+- `POST /api/research/screening-output` (preferred A -> B path)
 - `POST /api/research/runs`
 - `POST /api/research/batch`
 - `GET /api/research/runs/:runId`
@@ -369,6 +380,9 @@ Live semantic E01–E10 evaluation is intentionally separate from deterministic 
 
 ### P0 — implemented
 
+- Data PR #5 `screening-output-v1` -> B adapter
+- upstream quantitative Evidence / riskFlag preservation
+- duplicate monthly-revenue lookup prevention
 - A/B and B/C contracts
 - typed research harness
 - explicit state
@@ -431,14 +445,17 @@ Static MVP DoD is satisfied when:
 - prompt-injection fixture exists.
 - latency/token telemetry is recorded.
 - A candidate list can produce a deterministic Top-K output.
+- the exact Data Layer `screening-output-v1` contract can enter B without losing Evidence lineage.
+- C can develop against a credential-free mock server using the same HTTP contract.
 
 ## 19. Remaining live-only validation
 
 The code can continue without user interaction up to this point. Remaining validation requires external credentials/runtime execution:
 
-1. rerun the current live Gemini path after the latest controller-policy changes;
+1. rerun the current live Gemini path using a real `screening-output-v1` document after upstream-evidence ingestion;
 2. run repeated live semantic E01–E10 cases and record pass rate/latency/tokens;
-3. when switching providers, choose the production OpenAI model/credential setup and add the OpenAI adapter.
+3. perform one C-side real API consumption check after mock UI development;
+4. when switching providers, choose the production OpenAI model/credential setup and add the OpenAI adapter.
 
 These are runtime/provider validation tasks, not missing core MVP architecture.
 
