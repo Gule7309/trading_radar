@@ -58,6 +58,7 @@ function mockResult(candidate: CandidatePacket): ResearchResult {
         explanation:
           "Mock risk content for frontend development only. Live research must replace this text.",
         sourceIds: [riskSourceId],
+        addressesRiskFlags: candidate.riskFlags ?? [],
       },
     ],
     invalidationConditions: [
