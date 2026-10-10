@@ -9,6 +9,6 @@ export type { ResearchResult } from "../domain/research.js";
 export type {
   BatchResearchOptions,
   BatchResearchResult,
-  RankedResearchResult,
 } from "../research/batch-service.js";
+export type { RankedResearchResult } from "../research/ranking.js";
 export type { ThesisEvent, ThesisVersion } from "../thesis/types.js";
