@@ -85,7 +85,7 @@ PK：`(stock_id, year, quarter)`。金額單位皆為**千元**。
 | `revenue`、`gross_profit`、`operating_income`、`net_income`、`eps` | 損益表，**年初至今累計值**（Q2 = 1–6 月合計） |
 | `gross_margin`、`operating_margin`、`roe`、`roa` | 由累計值算出的比率（%） |
 | `*_quarter`（`revenue_quarter`、`operating_income_quarter`、`eps_quarter`、`operating_margin_quarter` …） | **單季值**。Q1 = 累計值；Q2–Q4 = 本季累計 − 上季累計；上季缺漏時為 NULL，不硬算 |
-| `total_assets`、`total_liabilities`、`equity` | 資產負債表，**季底時點值** |
+| `total_assets`、`total_liabilities`、`equity` | 資產負債表，**季底時點值**。`equity` 是「歸屬於母公司業主之權益」（不含非控制權益），所以**資產 ≠ 負債＋權益**是正常的 |
 | `debt_ratio` | `total_liabilities ÷ total_assets × 100` |
 | `statement_type` | `general`（一般業）、`bank`、`financial_holding`、`securities`、`other`、`unknown` |
 | `available_date` | **估計可用日**（保守推算：Q1 5/31、Q2 8/31、Q3 11/30、Q4 次年 3/31），**不是實際公告日** |

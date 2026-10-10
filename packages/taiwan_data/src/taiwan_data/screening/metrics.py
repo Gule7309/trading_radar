@@ -68,23 +68,50 @@ class Record:
 
 def resolve_periods(conn: sqlite3.Connection, as_of: date, config: ScreeningConfig) -> Periods:
     iso = as_of.isoformat()
-    price_as_of = conn.execute(
-        "SELECT MAX(trade_date) FROM daily_prices WHERE trade_date <= ?", (iso,)).fetchone()[0]
-    if not price_as_of:
-        raise ScreeningError(f"{iso} 以前沒有任何行情資料")
-    window = [r[0] for r in conn.execute(
-        "SELECT DISTINCT trade_date FROM daily_prices WHERE trade_date <= ? "
-        "ORDER BY trade_date DESC LIMIT ?", (price_as_of, config.turnover_window_days))]
-    if len(window) < config.turnover_window_days:
-        raise ScreeningError(f"行情不足 {config.turnover_window_days} 個交易日")
-
+    price_as_of, window = _resolve_price_window(conn, as_of, config)
     month, month_coverage = _resolve_revenue_month(conn, as_of, config)
     quarter, quarter_coverage = _resolve_financial_quarter(conn, iso, config)
     return Periods(
-        as_of_date=iso, price_as_of=price_as_of, window_dates=tuple(reversed(window)),
+        as_of_date=iso, price_as_of=price_as_of, window_dates=window,
         revenue_month=month, revenue_coverage=month_coverage,
         financial_quarter=quarter, financial_coverage=quarter_coverage,
     )
+
+
+def _coverage(count: int, previous: list[int]) -> float:
+    """本期檔數 ÷ 前 COVERAGE_LOOKBACK 期的最大檔數；取最大值可避免連續兩期都不完整時互相「背書」。"""
+    base = max(previous, default=0)
+    return count / base if base else 0.0
+
+
+COVERAGE_LOOKBACK = 3
+
+
+def _resolve_price_window(conn: sqlite3.Connection, as_of: date, config: ScreeningConfig):
+    # 每個交易日的筆數；最新一天若只匯入了一個市場，會因涵蓋率不足而退回前一個完整交易日。
+    need = config.turnover_window_days + config.scan_periods + COVERAGE_LOOKBACK
+    rows = conn.execute(
+        "SELECT trade_date, COUNT(*) FROM daily_prices WHERE trade_date BETWEEN ? AND ? "
+        "GROUP BY trade_date ORDER BY trade_date DESC LIMIT ?",
+        ((as_of - timedelta(days=need * 3 + 30)).isoformat(), as_of.isoformat(), need)).fetchall()
+    if not rows:
+        raise ScreeningError(f"{as_of.isoformat()} 以前沒有任何行情資料")
+    for i in range(min(config.scan_periods, len(rows))):
+        previous = [n for _, n in rows[i + 1:i + 1 + COVERAGE_LOOKBACK]]
+        if previous and _coverage(rows[i][1], previous) >= config.price_coverage_threshold:
+            break
+    else:
+        raise ScreeningError(f"最近 {config.scan_periods} 個交易日沒有行情涵蓋率達 "
+                             f"{config.price_coverage_threshold:.0%} 的日期")
+    window = rows[i:i + config.turnover_window_days]
+    if len(window) < config.turnover_window_days:
+        raise ScreeningError(f"行情不足 {config.turnover_window_days} 個交易日")
+    # 窗口中間缺了某市場的一天，會讓整個市場的 20 日均量都不完整；明確失敗，而不是默默排除。
+    full = max(n for _, n in window)
+    for trade_date, n in window:
+        if n / full < config.price_coverage_threshold:
+            raise ScreeningError(f"{trade_date} 的行情只有 {n} 筆（窗口內最多 {full} 筆），請先補齊再執行")
+    return rows[i][0], tuple(d for d, _ in reversed(window))
 
 
 def _resolve_revenue_month(conn: sqlite3.Connection, as_of: date, config: ScreeningConfig):
@@ -93,12 +120,13 @@ def _resolve_revenue_month(conn: sqlite3.Connection, as_of: date, config: Screen
     counts = dict(conn.execute(
         "SELECT year_month, COUNT(revenue) FROM monthly_revenue "
         "WHERE year_month BETWEEN ? AND ? GROUP BY year_month",
-        (add_months(cap, -config.scan_periods), cap)).fetchall())
+        (add_months(cap, -(config.scan_periods + COVERAGE_LOOKBACK)), cap)).fetchall())
     for i in range(config.scan_periods):
         month = add_months(cap, -i)
-        previous = counts.get(add_months(month, -1), 0)
-        if previous and counts.get(month, 0) / previous >= config.revenue_coverage_threshold:
-            return month, counts[month] / previous
+        previous = [counts.get(add_months(month, -k), 0) for k in range(1, COVERAGE_LOOKBACK + 1)]
+        coverage = _coverage(counts.get(month, 0), previous)
+        if coverage >= config.revenue_coverage_threshold:
+            return month, coverage
     raise ScreeningError(
         f"{cap} 起往前 {config.scan_periods} 個月內沒有營收涵蓋率達 "
         f"{config.revenue_coverage_threshold:.0%} 的月份")
@@ -108,9 +136,10 @@ def _resolve_financial_quarter(conn: sqlite3.Connection, iso: str, config: Scree
     rows = conn.execute(
         "SELECT year * 10 + quarter AS q, COUNT(*) FROM quarterly_financials "
         "WHERE statement_type = 'general' AND available_date <= ? "
-        "GROUP BY q ORDER BY q DESC LIMIT ?", (iso, config.scan_periods + 1)).fetchall()
-    for i in range(len(rows) - 1):
-        coverage = rows[i][1] / rows[i + 1][1] if rows[i + 1][1] else 0.0
+        "GROUP BY q ORDER BY q DESC LIMIT ?",
+        (iso, config.scan_periods + COVERAGE_LOOKBACK)).fetchall()
+    for i in range(min(config.scan_periods, len(rows) - 1)):
+        coverage = _coverage(rows[i][1], [n for _, n in rows[i + 1:i + 1 + COVERAGE_LOOKBACK]])
         if coverage >= config.financial_coverage_threshold:
             return rows[i][0], coverage
     raise ScreeningError(
@@ -151,14 +180,18 @@ def load_records(
 
     records: list[Record] = []
     for row in conn.execute(
-            "SELECT stock_id, stock_name, market, industry_code, is_active FROM stocks ORDER BY stock_id"):
+            "SELECT stock_id, stock_name, market, industry_code, is_active, listing_date, delisting_date "
+            "FROM stocks ORDER BY stock_id"):
         record = Record(
             stock_id=row["stock_id"], stock_name=row["stock_name"], market=row["market"],
-            industry=row["industry_code"] or UNGROUPED_INDUSTRY, is_active=bool(row["is_active"]),
+            industry=row["industry_code"] or UNGROUPED_INDUSTRY,
+            is_active=_listed_on(iso, row["is_active"], row["listing_date"], row["delisting_date"]),
             notice_flag=row["stock_id"] in noticed, disposition_flag=row["stock_id"] in disposed,
         )
         record.financial_row = financials.get(record.stock_id)
         reason = _scope_exclusion(record, earlier)
+        if reason == "inactive" and row["listing_date"] and row["listing_date"] > iso:
+            reason = "not_listed"
         if reason is None:
             record.metrics = {
                 "revenue_yoy": _revenue_yoy(
@@ -179,6 +212,15 @@ def load_records(
         record.exclusion_reason = reason
         records.append(record)
     return records
+
+
+def _listed_on(iso: str, is_active: int, listing_date: str | None, delisting_date: str | None) -> bool:
+    """as_of 當天是否掛牌。回推過去時不能用「現在」的 is_active，否則之後才下市的公司會被誤排除。"""
+    if listing_date and listing_date > iso:
+        return False
+    if is_active:
+        return True
+    return bool(delisting_date) and delisting_date > iso
 
 
 def _scope_exclusion(record: Record, earlier: dict[str, int]) -> str | None:

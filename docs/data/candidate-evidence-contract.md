@@ -36,7 +36,7 @@ Data Layer 交付給其他模組的唯一介面是一份 JSON 文件：**候選�
 | `asOfDate` | `2026-10-10` | 評估基準日 |
 | `priceAsOf` | `2026-10-08` | 實際使用的最後交易日 |
 | `revenueAsOf` | `2026-08` | **所有股票共用**的營收月份 |
-| `revenueCoverage` | `1.0005` | 該月有營收的檔數 ÷ 前一月檔數 |
+| `revenueCoverage` | `1.0005` | 該月有營收的檔數 ÷ 前 3 個月中最多的檔數 |
 | `financialAsOf` | `2026Q2` | **所有股票共用**的財報季度 |
 | `financialCoverage` | `1.0005` | 同上，以季度計 |
 | `configVersion`、`config` | `v1` | 系統參數（門檻、窗口長度等） |
@@ -119,17 +119,17 @@ Data Layer 交付給其他模組的唯一介面是一份 JSON 文件：**候選�
 | `sourceUrl` | 官方資料端點（取自實際抓取紀錄，不編造）。部分是 API 端點，瀏覽器直接開可能不是好讀的頁面 |
 | `referenceUrl` | 給人看的參考頁；目前沒有穩定網址時為 `null` |
 | `dataAsOf`、`windowStart`、`windowEnd` | 資料期間：營收為月份（去年同月 → 本月），財報為季度，成交金額為日期區間 |
-| `fetchedAt`、`fetchedAtScope` | `row`＝這筆資料自己的抓取時間（財報）；`dataset`＝該資料集最近一次更新時間（月營收、行情） |
-| `calculation` | `formula` 與原始輸入數字；金額輸入的單位寫在 `inputs` 內（例如 `revenueUnit: "TWD thousand"`） |
+| `fetchedAt`、`fetchedAtScope` | `row`＝這筆資料自己的抓取時間（財報）；`dataset`＝該資料集最近一次**成功**更新的時間（月營收、行情） |
+| `calculation` | `formula`（公式）、`method`（實際做了哪一種驗證）與 `inputs`（原始輸入數字；金額單位寫在 `inputs` 內，例如 `revenueUnit: "TWD thousand"`） |
 | `verificationStatus` | 正式輸出中**一定是 `verified`** |
 
 四種 Evidence：
 
-| metric | claim 範例 | 計算 | 驗證方式 |
+| metric | claim 範例 | 計算 | 驗證方式（`calculation.method`） |
 |---|---|---|---|
-| `revenueYoY` | 2026-08 月營收年增 344.4% | 本月營收 ÷ 去年同月營收 − 1 | 與 MOPS 提供的年增率比對（容差 0.1 個百分點） |
-| `operatingMargin` | 2026Q2 單季營業利益率 82.1% | 單季營業利益 ÷ 單季營收 | 與資料表內單季比率比對 |
-| `debtRatio` | 2026Q2 負債比 28.4% | 總負債 ÷ 總資產 | 與資料表內比率比對 |
+| `revenueYoY` | 2026-08 月營收年增 344.4% | 本月營收 ÷ 去年同月營收 − 1 | **獨立交叉比對**：與 MOPS 公布的年增率比對（容差 0.1 個百分點） |
+| `operatingMargin` | 2026Q2 單季營業利益率 82.1% | 單季營業利益 ÷ 單季營收 | 輸入完整、推導一致；**沒有第二個獨立來源** |
+| `debtRatio` | 2026Q2 負債比 28.4% | 總負債 ÷ 總資產 | 輸入完整、推導一致；**沒有第二個獨立來源** |
 | `avgTurnover20d` | 近 20 個交易日（2026-09-09 至 2026-10-08）日均成交金額 61.2 億元 | 20 個交易日成交金額平均 | 20 天都必須有資料 |
 
 ### `excluded`
@@ -144,7 +144,8 @@ Data Layer 交付給其他模組的唯一介面是一份 JSON 文件：**候選�
 
 | 原因 | 階段 | 意義 |
 |---|---|---|
-| `inactive` | base | 已下市／終止上櫃 |
+| `not_listed` | base | 基準日時尚未上市 |
+| `inactive` | base | 基準日時已下市／終止上櫃 |
 | `not_general_statement` | base | 金融等非一般業，此模型不適用 |
 | `missing_financials` | base | 沒有可用財報 |
 | `financials_not_common_quarter` | base | 沒有本次共同季度的財報 |
@@ -181,12 +182,13 @@ Data Layer 交付給其他模組的唯一介面是一份 JSON 文件：**候選�
 3. 一個 Evidence ID 只代表一個 run 內的一個數字；保存對話或報告時要連同 `runId`。
 4. `riskFlags` 必須在論述中揭露，不可忽略。
 5. 財報的可用日是**估計值**（`availabilityCutoff`），不要描述成「公司於某日公告」。
-6. `fetchedAtScope = "dataset"` 時，`fetchedAt` 是資料集最近更新時間，不要寫成「這筆資料於某時抓取」。
-7. 新聞、重大訊息等外部資料由 Agent 層自行建立 Evidence；不要混用 Data Layer 的 `ev-` 編號。
+6. `fetchedAtScope = "dataset"` 時，`fetchedAt` 是資料集最近一次成功更新的時間，不要寫成「這筆資料於某時抓取」。
+7. 營業利益率與負債比的 `verified` 只代表「輸入完整、推導一致」，不要描述成「經獨立來源交叉驗證」；`calculation.method` 有寫明。
+8. 新聞、重大訊息等外部資料由 Agent 層自行建立 Evidence；不要混用 Data Layer 的 `ev-` 編號。
 
 ## 給 Frontend 的建議
 
-- **Evidence Card**：標題用 `claim`；展開顯示 `source`、`dataAsOf`、`windowStart`–`windowEnd`、`calculation.formula`、
+- **Evidence Card**：標題用 `claim`；展開顯示 `source`、`dataAsOf`、`windowStart`–`windowEnd`、`calculation.formula`、`calculation.method`、
   `calculation.inputs`、`fetchedAt`（`dataset` 時標示「資料集更新時間」）、`sourceUrl`。
 - **數字格式**：`unit = "%"` 顯示到小數 1 位；`unit = "TWD"` 建議以「億元」顯示（÷ 1e8）。
 - **percentile**：可畫成 0–100 的進度條；`debtRatio` 那條請標示「財務安全度」而不是「負債比名次」。

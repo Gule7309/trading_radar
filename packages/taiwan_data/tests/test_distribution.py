@@ -104,3 +104,18 @@ def test_snapshot_refuses_to_overwrite(tmp_path):
     with pytest.raises(FileExistsError):
         create_snapshot(src.path, tmp_path / "dist", kind="full", version="t1")
     json.loads((tmp_path / "dist" / "manifest-full.json").read_text(encoding="utf-8"))
+
+
+def test_opening_the_downloaded_database_does_not_force_a_redownload(tmp_path):
+    src = _seed(tmp_path / "src.sqlite")
+    out = tmp_path / "dist"
+    create_snapshot(src.path, out, kind="full", version="t1")
+    dest = tmp_path / "dev" / "taiwan_stock.sqlite"
+    download_snapshot(dest, kind="full", source=str(out))
+    DataStore(dest).status()  # 一般連線會切換 WAL 模式並改寫檔頭（隊友執行 status／screen 的情況）
+    assert download_snapshot(dest, kind="full", source=str(out))["status"] == "up_to_date"
+    local = json.loads(dest.with_suffix(".manifest.json").read_text(encoding="utf-8"))
+    assert local["distribution"]["version"] == "t1" and local["data_version"].startswith("ds-")
+    # 新版本發佈後才重新下載
+    create_snapshot(src.path, tmp_path / "dist2", kind="full", version="t2")
+    assert download_snapshot(dest, kind="full", source=str(tmp_path / "dist2"))["status"] == "downloaded"

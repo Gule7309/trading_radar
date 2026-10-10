@@ -132,6 +132,7 @@
           "required": ["formula", "inputs"],
           "properties": {
             "formula": { "type": "string" },
+            "method": { "type": "string", "description": "實際做了哪一種驗證（是否為獨立來源比對）" },
             "inputs": { "type": "object" }
           }
         },

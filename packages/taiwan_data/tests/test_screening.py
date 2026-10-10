@@ -28,7 +28,8 @@ FIXTURE = Path(__file__).parent / "fixtures" / "sample_screening_output.json"
 
 DATES = [(date(2026, 9, 14) + timedelta(days=i)).isoformat() for i in range(25)]  # 09-14 .. 10-08
 WINDOW = DATES[-20:]
-CFG = ScreeningConfig(financial_coverage_threshold=0.9)  # 合成資料 Q2/Q1 = 14/15
+CFG = ScreeningConfig(financial_coverage_threshold=0.9,  # 合成資料 Q2/Q1 = 14/15
+                      price_coverage_threshold=0.9)    # 只有 14 檔，P1 前 15 天沒有行情（13/14）
 
 A_OI = [200, 400, 100, 350, 300, 250]
 A_LIAB = [300, 500, 100, 600, 200, 400]
@@ -93,7 +94,8 @@ def seed(path, september=None):
         if s["prior"] is not None:
             revenue += [(sid, "2025-08", s["prior"], 0.0), (sid, "2025-09", 100, 0.0)]
         yoy = s.get("source_yoy", round((s["rev"] / s["prior"] - 1) * 100, 2) if s["prior"] else None)
-        revenue += [(sid, "2026-07", s["rev"] * 0.9, 0.0), (sid, "2026-08", s["rev"], yoy)]
+        revenue += [(sid, "2026-06", s["rev"] * 0.8, 0.0), (sid, "2026-07", s["rev"] * 0.9, 0.0),
+                    (sid, "2026-08", s["rev"], yoy)]
         if september == "full" or (september == "partial" and sid in ("A1", "A2", "A3")):
             revenue.append((sid, "2026-09", s["rev"] * 1.1, s.get("source_yoy", None if not s["prior"] else
                                                                 round((s["rev"] * 1.1 / 100 - 1) * 100, 2))))
@@ -233,11 +235,11 @@ def test_revenue_coverage_gate_falls_back_to_last_complete_month(tmp_path):
     row = _run_row(partial, run(partial))
     assert row["revenue_as_of"] == "2026-08" and row["revenue_coverage"] == pytest.approx(1.0)
     # 門檻是 config：降到 0.2 後 9 月（3/14 ≈ 0.21）即被採用，且 coverage 被保存
-    loose = run(partial, config=ScreeningConfig(financial_coverage_threshold=0.9, revenue_coverage_threshold=0.2))
+    loose = run(partial, config=ScreeningConfig(financial_coverage_threshold=0.9, price_coverage_threshold=0.9, revenue_coverage_threshold=0.2))
     assert _run_row(partial, loose)["revenue_as_of"] == "2026-09"
     assert _run_row(partial, loose)["revenue_coverage"] == pytest.approx(3 / 14, abs=1e-5)
     with pytest.raises(ScreeningError):
-        run(partial, config=ScreeningConfig(financial_coverage_threshold=0.9, scan_periods=1))
+        run(partial, config=ScreeningConfig(financial_coverage_threshold=0.9, price_coverage_threshold=0.9, scan_periods=1))
 
 
 def test_complete_month_is_used_only_after_the_statutory_deadline(tmp_path):
@@ -389,7 +391,7 @@ def test_notice_is_only_a_flag_and_does_not_change_ranks(store):
     with_flag = results(store, run(store))
     assert with_flag["N1"]["notice_flag"] == 1 and with_flag["A1"]["notice_flag"] == 0  # 超出 30 日
     no_lookback = results(store, run(store, config=ScreeningConfig(
-        financial_coverage_threshold=0.9, notice_lookback_days=1)))
+        financial_coverage_threshold=0.9, price_coverage_threshold=0.9, notice_lookback_days=1)))
     assert no_lookback["N1"]["notice_flag"] == 0
     assert {s: r["rank"] for s, r in with_flag.items()} == {s: r["rank"] for s, r in no_lookback.items()}
     out = load_output(store, run(store), limit=20)
@@ -401,7 +403,7 @@ def test_limit_is_bounded_by_evidence_top_k(store):
     for bad in (0, 51):
         with pytest.raises(ValueError):
             get_candidates(store, config=CFG, as_of_date="2026-10-10", limit=bad)
-    small = ScreeningConfig(financial_coverage_threshold=0.9, evidence_top_k=3)
+    small = ScreeningConfig(financial_coverage_threshold=0.9, price_coverage_threshold=0.9, evidence_top_k=3)
     out = get_candidates(store, config=small, as_of_date="2026-10-10", limit=3)
     assert len(out["candidates"]) == 3 and len(out["evidence"]) == 12
     with pytest.raises(ValueError):
@@ -412,7 +414,7 @@ def test_output_document_and_cli_match_the_schema(store, tmp_path):
     jsonschema.validate(get_candidates(store, config=CFG, as_of_date="2026-10-10", limit=20), SCHEMA)
     out_path = tmp_path / "out" / "candidates.json"
     config_path = tmp_path / "config.json"
-    config_path.write_text(json.dumps({"financialCoverageThreshold": 0.9}), encoding="utf-8")
+    config_path.write_text(json.dumps({"financialCoverageThreshold": 0.9, "priceCoverageThreshold": 0.9}), encoding="utf-8")
     cli.main(["screen", "--db", str(store.path), "--as-of", "2026-10-10", "--limit", "5",
               "--config", str(config_path), "--max-debt-ratio", "55", "--output", str(out_path)])
     document = json.loads(out_path.read_text(encoding="utf-8"))
@@ -484,3 +486,108 @@ def test_financial_availability_is_labelled_as_an_estimated_cutoff(store):
     inputs = next(e for e in out["evidence"] if e["metric"] == "operatingMargin")["calculation"]["inputs"]
     assert inputs["availabilityCutoff"] == "2026-08-31"
     assert "availableDate" not in inputs
+
+
+# 審查修正（PR #5 review）─────────────────────────────────────────────────
+def test_verification_method_is_stated_honestly(store):
+    out = get_candidates(store, config=CFG, as_of_date="2026-10-10", limit=20)
+    method = {e["metric"]: e["calculation"]["method"] for e in out["evidence"]}
+    assert "交叉比對" in method["revenueYoY"]
+    for metric in ("operatingMargin", "debtRatio"):  # 沒有獨立來源，不得宣稱交叉驗證
+        assert "沒有第二個獨立來源" in method[metric] and "交叉比對" not in method[metric]
+
+
+def test_fetched_at_ignores_failed_refreshes(store):
+    with closing(store.connect()) as conn, conn:
+        conn.execute("INSERT INTO ingest_runs (dataset, started_at, finished_at, status, source, row_count) "
+                     "VALUES ('monthly_revenue', '2026-10-09T01:00:00+08:00', '2026-10-09T01:05:00+08:00', "
+                     "'success', 'x', 1)")
+        conn.execute("UPDATE dataset_status SET status = 'failed', fetched_at = '2026-10-10T21:30:00+08:00' "
+                     "WHERE dataset = 'monthly_revenue'")
+    out = get_candidates(store, config=CFG, as_of_date="2026-10-10", limit=20)
+    revenue = next(e for e in out["evidence"] if e["metric"] == "revenueYoY")
+    assert revenue["fetchedAt"] == "2026-10-09T01:05:00+08:00"  # 最後一次成功，而不是失敗那次
+
+
+def test_financial_source_url_matches_the_stock_market(store):
+    with closing(store.connect()) as conn, conn:
+        conn.execute("UPDATE quarterly_financials SET source_kind = 'openapi' WHERE stock_id IN ('A1', 'B1')")
+        conn.execute(
+            "INSERT INTO dataset_status (dataset, as_of_value, fetched_at, source, status, row_count) VALUES "
+            "('quarterly_financials', '2026-Q2', '2026-10-10T01:12:23+08:00', ?, 'success', 1)",
+            ("https://openapi.twse.com.tw/v1/opendata/t187ap06_L_ci;"
+             "https://www.tpex.org.tw/openapi/v1/mopsfin_t187ap06_O_ci;"
+             "https://openapi.twse.com.tw/v1/opendata/t187ap07_L_ci;"
+             "https://www.tpex.org.tw/openapi/v1/mopsfin_t187ap07_O_ci",))
+    out = get_candidates(store, config=CFG, as_of_date="2026-10-10", limit=20)
+    pick = lambda stock, metric: next(e for e in out["evidence"] if e["stockId"] == stock and e["metric"] == metric)
+    assert pick("B1", "operatingMargin")["sourceUrl"] == "https://www.tpex.org.tw/openapi/v1/mopsfin_t187ap06_O_ci"
+    assert pick("B1", "debtRatio")["sourceUrl"] == "https://www.tpex.org.tw/openapi/v1/mopsfin_t187ap07_O_ci"
+    assert pick("B1", "operatingMargin")["source"] == "TPEx OpenAPI"
+    assert pick("A1", "debtRatio")["sourceUrl"] == "https://openapi.twse.com.tw/v1/opendata/t187ap07_L_ci"
+
+
+def test_historical_as_of_uses_listing_status_on_that_date(store):
+    with closing(store.connect()) as conn, conn:
+        conn.execute("UPDATE stocks SET is_active = 0, delisting_date = '2026-10-20' WHERE stock_id = 'A6'")
+        conn.execute("UPDATE stocks SET listing_date = '2026-10-15' WHERE stock_id = 'A5'")
+    rows = results(store, run(store))
+    assert rows["A6"]["rank"] is not None             # 10/10 時尚未下市，不應被當成 inactive
+    assert rows["A5"]["exclusion_reason"] == "not_listed"
+    assert rows["X1"]["exclusion_reason"] == "inactive"  # 沒有下市日的已下市股票仍排除
+
+
+def test_price_date_falls_back_when_the_latest_day_is_incomplete(store):
+    with closing(store.connect()) as conn, conn:  # 最新一天只匯入了部分股票（例如上櫃抓取失敗）
+        conn.execute("DELETE FROM daily_prices WHERE trade_date = ? AND stock_id IN ('A1','A2','A3','B1')",
+                     (DATES[-1],))
+    row = _run_row(store, run(store))
+    assert row["price_as_of"] == DATES[-2]
+
+
+def test_incomplete_day_inside_the_window_fails_loudly(store):
+    with closing(store.connect()) as conn, conn:
+        conn.execute("DELETE FROM daily_prices WHERE trade_date = ? AND stock_id IN ('A1','A2','A3','B1')",
+                     (DATES[-5],))
+    with pytest.raises(ScreeningError, match=DATES[-5]):
+        run(store)
+
+
+def test_revenue_coverage_is_measured_against_the_recent_maximum(store):
+    with closing(store.connect()) as conn, conn:  # 7 月與 8 月都只匯入一半，6 月完整
+        conn.execute("DELETE FROM monthly_revenue WHERE year_month IN ('2026-07', '2026-08') "
+                     "AND stock_id IN ('A1','A2','A3','A4','A5','A6','B1')")
+    with pytest.raises(ScreeningError):  # 8 月 7/7 不再被當成 100%
+        run(store)
+
+
+def test_run_ids_do_not_collide_after_a_run_is_deleted(store):
+    first, second = run(store, reuse=False), run(store, reuse=False)
+    with closing(store.connect()) as conn, conn:
+        conn.execute("DELETE FROM screening_runs WHERE run_id = ?", (first,))
+    third = run(store, reuse=False)
+    assert third not in (first, second) and int(third[-3:]) == int(second[-3:]) + 1
+
+
+def test_load_output_rejects_limits_beyond_the_stored_evidence(store):
+    run_id = run(store, config=ScreeningConfig(financial_coverage_threshold=0.9, price_coverage_threshold=0.9,
+                                               evidence_top_k=3))
+    assert len(load_output(store, run_id, limit=3)["candidates"]) == 3
+    with pytest.raises(ValueError, match="evidence_top_k"):
+        load_output(store, run_id, limit=4)
+
+
+def test_config_is_validated_on_direct_construction():
+    for bad in (dict(turnover_window_days=0), dict(price_coverage_threshold=0),
+                dict(revenue_coverage_threshold=1.5), dict(scan_periods=0), dict(yoy_tolerance_pp=-1)):
+        with pytest.raises(ValueError):
+            ScreeningConfig(**bad)
+
+
+def test_downloaded_database_gets_a_source_snapshot(store, tmp_path):
+    from taiwan_data.distribution import create_snapshot, download_snapshot
+    manifest = create_snapshot(store.path, tmp_path / "dist", kind="full", version="t1")
+    dest = tmp_path / "teammate" / "taiwan_stock.sqlite"
+    download_snapshot(dest, kind="full", source=str(tmp_path / "dist"))
+    out = get_candidates(DataStore(dest), config=CFG, as_of_date="2026-10-10")
+    assert out["run"]["sourceSnapshot"] == f"sha256:{manifest['database_sha256']}"

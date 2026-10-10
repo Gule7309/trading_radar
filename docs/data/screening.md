@@ -44,7 +44,7 @@ Python 與 DB 一律 snake_case。
 | 欄位 | 預設 |
 |---|---|
 | `version` | `v1` |
-| `revenueCoverageThreshold`／`financialCoverageThreshold` | 0.95 |
+| `revenueCoverageThreshold`／`financialCoverageThreshold`／`priceCoverageThreshold` | 0.95 |
 | `scanPeriods` | 6（最多往前找幾個月／季） |
 | `minIndustrySize` | 5 |
 | `turnoverWindowDays` | 20 |
@@ -71,7 +71,8 @@ Python 與 DB 一律 snake_case。
 
 | `exclusion_reason` | 條件 |
 |---|---|
-| `inactive` | `stocks.is_active = 0` |
+| `not_listed` | `as_of_date` 時尚未上市（`listing_date > as_of_date`） |
+| `inactive` | `as_of_date` 時已下市。回推過去時依 `delisting_date` 判斷，不用「現在」的 `is_active`，避免之後才下市的公司被誤排除 |
 | `not_general_statement` | 財報 `statement_type` 不是 `general`（銀行、金控、保險、證券、其他）。**此版排名模型不適用，不硬算** |
 | `missing_financials` | 沒有任何可用財報 |
 | `financials_not_common_quarter` | 有財報但沒有本次共同季度的財報（例如 run 選 2026Q2，該公司只有 2026Q1）。**不與他人混排** |
@@ -88,14 +89,20 @@ Python 與 DB 一律 snake_case。
 
 ## 指標定義與驗證
 
-| 指標 | 計算 | 來源欄位 | 交叉驗證 |
+| 指標 | 計算 | 來源欄位 | 驗證 |
 |---|---|---|---|
 | `revenueYoY` (%) | `本月營收 ÷ 去年同月營收 − 1` | `monthly_revenue` | 與來源值 `yoy_pct` 比對，差 > 0.1pp → `conflict`；來源值為空 → `partial`；缺本期／去年同期或去年同期 ≤ 0 → `insufficient` |
-| `operatingMargin` (%) | `operating_income_quarter ÷ revenue_quarter`（**單季值**，非累計） | `quarterly_financials` | 與 `operating_margin_quarter` 比對 |
-| `debtRatio` (%) | `total_liabilities ÷ total_assets` | `quarterly_financials` | 與 `debt_ratio` 比對 |
+| `operatingMargin` (%) | `operating_income_quarter ÷ revenue_quarter`（**單季值**，非累計） | `quarterly_financials` | 輸入完整且與資料表內推導值一致。**沒有第二個獨立來源**（見下方說明） |
+| `debtRatio` (%) | `total_liabilities ÷ total_assets` | `quarterly_financials` | 同上。**沒有第二個獨立來源** |
 | `avgTurnover20d` (新台幣元) | 近 20 個**市場交易日**的 `AVG(turnover)` | `daily_prices` | 20 個交易日都有資料才是 `verified`；不足 → `partial` |
 
 營收單位為新台幣千元（MOPS 原始單位），Evidence 的 `calculation.inputs` 會標示。
+
+**驗證強度不同，必須如實說明**：只有 `revenueYoY` 是真正的獨立交叉比對（營收原始值 vs. MOPS 公布的年增率）。
+營業利益率與負債比的比對對象，是同一份財報在抓取時就以相同公式算出的推導值，所以只能確認「輸入完整、推導一致」，
+不能發現來源本身的錯誤。曾評估以會計恆等式（資產 = 負債＋權益）做獨立檢查，但資料表的 `equity` 是
+「歸屬於母公司業主之權益」（不含非控制權益），2026Q2 有 37% 的公司差距超過 0.5%，無法作為驗證依據。
+每筆 Evidence 的 `calculation.method` 會寫明實際做了哪一種驗證。
 
 ### verificationStatus
 
@@ -112,9 +119,12 @@ exclusion，所以每個有名次的股票必然符合這條規則；`partial`�
 
 ## 期間與 Coverage Gate
 
-- `price_as_of` = `as_of_date` 以前最後一個有行情的交易日。
+- **行情日**：`price_as_of` = `as_of_date` 以前、涵蓋率達門檻的最後一個交易日（最新一天若只匯入一個市場，
+  會退回前一個完整交易日）。20 日窗口內任何一天的筆數低於窗口最大值 × 門檻時，run **明確失敗**並指出日期，
+  不會默默把整個市場排除。
 - **營收月份**：只考慮已過法定公告期限的月份（月 M 在次月 10 日起可用，避免前視偏誤）。
-  `coverage(M) = M 月有營收的檔數 ÷ M−1 月有營收的檔數`（分母取自資料庫，不依賴外部名單）。
+  `coverage(M) = M 月有營收的檔數 ÷ 前 3 個月中最多的檔數`（分母取自資料庫，不依賴外部名單；
+  取前 3 期最大值，避免連續兩期都不完整時互相「背書」）。
   從最新可用月份往前找第一個 `coverage ≥ 門檻` 的月份；沒有任何一個通過則 run 失敗，不降級。
 - **共同財報季度**：同樣的規則，以 `statement_type='general'` 且 `available_date ≤ as_of_date`
   的檔數計算。
@@ -172,7 +182,7 @@ Evidence 在 screening 階段由指標推導產生，**不修改**原始資料�
 | `stockId`、`metric`、`claim`、`value`、`unit` | 論述與數值（`%` 或 `TWD`） |
 | `dataset`、`source`、`sourceUrl`、`referenceUrl` | 來源。`sourceUrl` 只取自 `dataset_status.source` 實際記錄的官方端點，不編造；沒有穩定參考頁時 `referenceUrl` 為 `null` |
 | `dataAsOf`、`windowStart`、`windowEnd` | 資料期間 |
-| `fetchedAt`、`fetchedAtScope` | 抓取時間。`row` = 該列自己的時間（財報）；`dataset` = 該資料集最近一次更新時間（月營收、行情沒有逐列時間） |
+| `fetchedAt`、`fetchedAtScope` | 抓取時間。`row` = 該列自己的時間（財報）；`dataset` = 該資料集最近一次**成功**更新的時間（月營收、行情沒有逐列時間；失敗或部分失敗的抓取不算） |
 | `calculation` | `formula` 與 `inputs`（原始輸入數字） |
 | `verificationStatus` | 見上 |
 
@@ -223,6 +233,9 @@ counts.ranked       = counts.baseEligible − excluded.byStage.constraint
 ## 已知限制
 
 - **產業粒度不一致**：見上方「產業 Percentile 與分數」。
+- **財報兩項指標沒有獨立驗證**：見上方「指標定義與驗證」。
+- **回推過去時，產業與市場用的是現況**：上市狀態會依 `listing_date`／`delisting_date` 回推，但 `industry_code`
+  與 `market`（例如上櫃轉上市）沒有歷史紀錄，用的是目前的值。
 - **`fetchedAt` 精細度**：月營收與行情只有資料集層級時間（`fetchedAtScope="dataset"`），不是逐列；財報才是逐列。
 - **`delisted_stocks` 含「上櫃轉上市」**：該表記錄櫃買的「終止上櫃」日期，因此約 89 檔現行上市股票也在其中
   （例如統新、藥華藥）。Screening 不使用此表，而是以 `stocks.is_active`、完整 20 日行情與共同季度財報判斷，

@@ -32,6 +32,7 @@ class ScreeningConfig:
     version: str = "v1"
     revenue_coverage_threshold: float = 0.95
     financial_coverage_threshold: float = 0.95
+    price_coverage_threshold: float = 0.95
     scan_periods: int = 6
     min_industry_size: int = 5
     turnover_window_days: int = 20
@@ -48,12 +49,19 @@ class ScreeningConfig:
         unknown = set(data) - known
         if unknown:
             raise ValueError(f"未知的 config 欄位：{sorted(unknown)}")
-        config = cls(**data)
-        if not 0 < config.revenue_coverage_threshold <= 1 or not 0 < config.financial_coverage_threshold <= 1:
+        return cls(**data)
+
+    def __post_init__(self) -> None:
+        thresholds = (self.revenue_coverage_threshold, self.financial_coverage_threshold,
+                      self.price_coverage_threshold)
+        if not all(0 < t <= 1 for t in thresholds):
             raise ValueError("coverage threshold 必須在 (0, 1]")
-        if config.min_industry_size < 2 or config.turnover_window_days < 1 or config.evidence_top_k < 1:
-            raise ValueError("min_industry_size／turnover_window_days／evidence_top_k 數值不合理")
-        return config
+        if (self.min_industry_size < 2 or self.turnover_window_days < 1 or self.evidence_top_k < 1
+                or self.scan_periods < 1 or self.notice_lookback_days < 0):
+            raise ValueError("min_industry_size／turnover_window_days／evidence_top_k／scan_periods／"
+                             "notice_lookback_days 數值不合理")
+        if min(self.yoy_tolerance_pp, self.margin_tolerance_pp, self.debt_tolerance_pp) < 0:
+            raise ValueError("tolerance 不可為負")
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)

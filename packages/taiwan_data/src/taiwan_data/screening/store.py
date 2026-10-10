@@ -23,9 +23,11 @@ def camel(name: str) -> str:
 
 def next_run_id(conn: sqlite3.Connection, run_date: str) -> str:
     prefix = run_date.replace("-", "")
-    count = conn.execute(
-        "SELECT COUNT(*) FROM screening_runs WHERE run_id LIKE ?", (prefix + "-%",)).fetchone()[0]
-    return f"{prefix}-{count + 1:03d}"
+    # 取最大序號而非筆數：刪除過 run 或序號有空洞時，用筆數推算會撞號。
+    last = conn.execute(
+        "SELECT MAX(CAST(substr(run_id, 10) AS INTEGER)) FROM screening_runs WHERE run_id LIKE ?",
+        (prefix + "-%",)).fetchone()[0]
+    return f"{prefix}-{(last or 0) + 1:03d}"
 
 
 def find_run(conn: sqlite3.Connection, fingerprint: str) -> str | None:
@@ -90,6 +92,9 @@ def load_output(conn: sqlite3.Connection, run_id: str, limit: int) -> dict[str, 
     run = conn.execute("SELECT * FROM screening_runs WHERE run_id = ?", (run_id,)).fetchone()
     if run is None:
         raise KeyError(f"找不到 screening run：{run_id}")
+    top_k = json.loads(run["config_json"]).get("evidence_top_k", 50)
+    if not 1 <= limit <= top_k:
+        raise ValueError(f"limit 必須介於 1 與此 run 的 evidence_top_k（{top_k}）之間")
     rows = conn.execute(
         "SELECT * FROM screening_results WHERE run_id = ? AND rank IS NOT NULL AND rank <= ? "
         "ORDER BY rank", (run_id, limit)).fetchall()

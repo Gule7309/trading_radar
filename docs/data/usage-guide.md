@@ -147,4 +147,6 @@ SELECT stock_id, stock_name, market, industry_code FROM stocks WHERE is_active =
 | `limit 必須介於 1 與 evidence_top_k（50）之間` | 一次最多 50 名 |
 | Windows 終端機中文變亂碼 | 主控台編碼問題，資料本身沒壞；用 `--output` 寫檔，或先執行 `$env:PYTHONIOENCODING = "utf-8"` |
 | 9 月營收已公布，但 `revenueAsOf` 還是 8 月 | 正常：涵蓋率未達 95% 前不會切換月份，避免不同公司用不同月份比較 |
+| `screen` 回報某天「行情只有 N 筆」 | 窗口內某個交易日缺了一部分資料（多半是某市場當天抓取失敗）；等維護者補齊並重新發佈，或用 `--as-of` 避開 |
+| `priceAsOf` 比最新交易日早一天 | 正常：最新一天資料不完整（例如只有上市）時，會退回前一個完整交易日 |
 | 想要新欄位或新指標 | 開 Issue 描述需求；不要在使用端自行修改資料庫 |

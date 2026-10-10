@@ -1,14 +1,14 @@
 {
   "schemaVersion": "screening-output-v1",
   "run": {
-    "runId": "20261010-001",
-    "runAt": "2026-10-10T13:40:18+08:00",
+    "runId": "20261010-002",
+    "runAt": "2026-10-10T14:31:07+08:00",
     "asOfDate": "2026-10-10",
     "priceAsOf": "2026-10-08",
     "revenueAsOf": "2026-08",
     "revenueCoverage": 1.000539,
     "financialAsOf": "2026Q2",
-    "financialCoverage": 1.000517,
+    "financialCoverage": 0.997421,
     "configVersion": "v1",
     "dataVersion": "ds-130b1ff5d3e877e2",
     "sourceSnapshot": "sha256:287b6a413bd3ada6dbc80b74270e716a507bd66dbbf82679c59c68556dae5b43",
@@ -31,6 +31,7 @@
       "marginTolerancePp": 0.1,
       "minIndustrySize": 5,
       "noticeLookbackDays": 30,
+      "priceCoverageThreshold": 0.95,
       "revenueCoverageThreshold": 0.95,
       "scanPeriods": 6,
       "turnoverWindowDays": 20,
@@ -338,7 +339,8 @@
           "revenue": 6466169.0,
           "revenueUnit": "TWD thousand",
           "sourceYoYPct": 344.41
-        }
+        },
+        "method": "以營收重算年增率，並與 MOPS 公布的年增率交叉比對（獨立比對，容差見 config）"
       },
       "verificationStatus": "verified"
     },
@@ -368,7 +370,8 @@
           "quarter": "2026Q2",
           "revenueQuarter": 10830041,
           "sourceOperatingMarginQuarter": 82.08460152643929
-        }
+        },
+        "method": "以 MOPS 財報的單季營業利益與單季營收重算，確認輸入完整且與資料表內推導值一致；此指標沒有第二個獨立來源可比對"
       },
       "verificationStatus": "verified"
     },
@@ -398,7 +401,8 @@
           "sourceDebtRatio": 28.352046712125574,
           "totalAssets": 47110680,
           "totalLiabilities": 13356842
-        }
+        },
+        "method": "以 MOPS 資產負債表的總負債與總資產重算，確認輸入完整且與資料表內推導值一致；此指標沒有第二個獨立來源可比對"
       },
       "verificationStatus": "verified"
     },
@@ -427,7 +431,8 @@
           "tradingDays": 20,
           "windowEnd": "2026-10-08",
           "windowStart": "2026-09-09"
-        }
+        },
+        "method": "窗口內每個市場交易日都必須有該股成交資料"
       },
       "verificationStatus": "verified"
     },
@@ -457,7 +462,8 @@
           "revenue": 181219.0,
           "revenueUnit": "TWD thousand",
           "sourceYoYPct": 239.98
-        }
+        },
+        "method": "以營收重算年增率，並與 MOPS 公布的年增率交叉比對（獨立比對，容差見 config）"
       },
       "verificationStatus": "verified"
     },
@@ -487,7 +493,8 @@
           "quarter": "2026Q2",
           "revenueQuarter": 385528,
           "sourceOperatingMarginQuarter": 23.566641074059472
-        }
+        },
+        "method": "以 MOPS 財報的單季營業利益與單季營收重算，確認輸入完整且與資料表內推導值一致；此指標沒有第二個獨立來源可比對"
       },
       "verificationStatus": "verified"
     },
@@ -517,7 +524,8 @@
           "sourceDebtRatio": 24.45120390065139,
           "totalAssets": 3464447,
           "totalLiabilities": 847099
-        }
+        },
+        "method": "以 MOPS 資產負債表的總負債與總資產重算，確認輸入完整且與資料表內推導值一致；此指標沒有第二個獨立來源可比對"
       },
       "verificationStatus": "verified"
     },
@@ -546,7 +554,8 @@
           "tradingDays": 20,
           "windowEnd": "2026-10-08",
           "windowStart": "2026-09-09"
-        }
+        },
+        "method": "窗口內每個市場交易日都必須有該股成交資料"
       },
       "verificationStatus": "verified"
     },
@@ -576,7 +585,8 @@
           "revenue": 44690268.0,
           "revenueUnit": "TWD thousand",
           "sourceYoYPct": 560.85
-        }
+        },
+        "method": "以營收重算年增率，並與 MOPS 公布的年增率交叉比對（獨立比對，容差見 config）"
       },
       "verificationStatus": "verified"
     },
@@ -606,7 +616,8 @@
           "quarter": "2026Q2",
           "revenueQuarter": 82549073,
           "sourceOperatingMarginQuarter": 73.68499098711865
-        }
+        },
+        "method": "以 MOPS 財報的單季營業利益與單季營收重算，確認輸入完整且與資料表內推導值一致；此指標沒有第二個獨立來源可比對"
       },
       "verificationStatus": "verified"
     },
@@ -636,7 +647,8 @@
           "sourceDebtRatio": 16.778415948685712,
           "totalAssets": 387758196,
           "totalLiabilities": 65059683
-        }
+        },
+        "method": "以 MOPS 資產負債表的總負債與總資產重算，確認輸入完整且與資料表內推導值一致；此指標沒有第二個獨立來源可比對"
       },
       "verificationStatus": "verified"
     },
@@ -665,7 +677,8 @@
           "tradingDays": 20,
           "windowEnd": "2026-10-08",
           "windowStart": "2026-09-09"
-        }
+        },
+        "method": "窗口內每個市場交易日都必須有該股成交資料"
       },
       "verificationStatus": "verified"
     },
@@ -695,7 +708,8 @@
           "revenue": 157044.0,
           "revenueUnit": "TWD thousand",
           "sourceYoYPct": 192.13
-        }
+        },
+        "method": "以營收重算年增率，並與 MOPS 公布的年增率交叉比對（獨立比對，容差見 config）"
       },
       "verificationStatus": "verified"
     },
@@ -725,7 +739,8 @@
           "quarter": "2026Q2",
           "revenueQuarter": 359185,
           "sourceOperatingMarginQuarter": 45.36130406336568
-        }
+        },
+        "method": "以 MOPS 財報的單季營業利益與單季營收重算，確認輸入完整且與資料表內推導值一致；此指標沒有第二個獨立來源可比對"
       },
       "verificationStatus": "verified"
     },
@@ -755,7 +770,8 @@
           "sourceDebtRatio": 10.547085692366599,
           "totalAssets": 5777084,
           "totalLiabilities": 609314
-        }
+        },
+        "method": "以 MOPS 資產負債表的總負債與總資產重算，確認輸入完整且與資料表內推導值一致；此指標沒有第二個獨立來源可比對"
       },
       "verificationStatus": "verified"
     },
@@ -784,7 +800,8 @@
           "tradingDays": 20,
           "windowEnd": "2026-10-08",
           "windowStart": "2026-09-09"
-        }
+        },
+        "method": "窗口內每個市場交易日都必須有該股成交資料"
       },
       "verificationStatus": "verified"
     },
@@ -814,7 +831,8 @@
           "revenue": 3225888.0,
           "revenueUnit": "TWD thousand",
           "sourceYoYPct": 90.9
-        }
+        },
+        "method": "以營收重算年增率，並與 MOPS 公布的年增率交叉比對（獨立比對，容差見 config）"
       },
       "verificationStatus": "verified"
     },
@@ -844,7 +862,8 @@
           "quarter": "2026Q2",
           "revenueQuarter": 7274516,
           "sourceOperatingMarginQuarter": 37.7919988078932
-        }
+        },
+        "method": "以 MOPS 財報的單季營業利益與單季營收重算，確認輸入完整且與資料表內推導值一致；此指標沒有第二個獨立來源可比對"
       },
       "verificationStatus": "verified"
     },
@@ -874,7 +893,8 @@
           "sourceDebtRatio": 28.685864532741444,
           "totalAssets": 33382738,
           "totalLiabilities": 9576127
-        }
+        },
+        "method": "以 MOPS 資產負債表的總負債與總資產重算，確認輸入完整且與資料表內推導值一致；此指標沒有第二個獨立來源可比對"
       },
       "verificationStatus": "verified"
     },
@@ -903,7 +923,8 @@
           "tradingDays": 20,
           "windowEnd": "2026-10-08",
           "windowStart": "2026-09-09"
-        }
+        },
+        "method": "窗口內每個市場交易日都必須有該股成交資料"
       },
       "verificationStatus": "verified"
     },
@@ -933,7 +954,8 @@
           "revenue": 520469.0,
           "revenueUnit": "TWD thousand",
           "sourceYoYPct": 180.9
-        }
+        },
+        "method": "以營收重算年增率，並與 MOPS 公布的年增率交叉比對（獨立比對，容差見 config）"
       },
       "verificationStatus": "verified"
     },
@@ -963,7 +985,8 @@
           "quarter": "2026Q2",
           "revenueQuarter": 1221178,
           "sourceOperatingMarginQuarter": 46.8866946505751
-        }
+        },
+        "method": "以 MOPS 財報的單季營業利益與單季營收重算，確認輸入完整且與資料表內推導值一致；此指標沒有第二個獨立來源可比對"
       },
       "verificationStatus": "verified"
     },
@@ -993,7 +1016,8 @@
           "sourceDebtRatio": 24.10337586674095,
           "totalAssets": 6217544,
           "totalLiabilities": 1498638
-        }
+        },
+        "method": "以 MOPS 資產負債表的總負債與總資產重算，確認輸入完整且與資料表內推導值一致；此指標沒有第二個獨立來源可比對"
       },
       "verificationStatus": "verified"
     },
@@ -1022,7 +1046,8 @@
           "tradingDays": 20,
           "windowEnd": "2026-10-08",
           "windowStart": "2026-09-09"
-        }
+        },
+        "method": "窗口內每個市場交易日都必須有該股成交資料"
       },
       "verificationStatus": "verified"
     },
@@ -1052,7 +1077,8 @@
           "revenue": 73340.0,
           "revenueUnit": "TWD thousand",
           "sourceYoYPct": 78.2
-        }
+        },
+        "method": "以營收重算年增率，並與 MOPS 公布的年增率交叉比對（獨立比對，容差見 config）"
       },
       "verificationStatus": "verified"
     },
@@ -1082,7 +1108,8 @@
           "quarter": "2026Q2",
           "revenueQuarter": 207778,
           "sourceOperatingMarginQuarter": 36.13808969188268
-        }
+        },
+        "method": "以 MOPS 財報的單季營業利益與單季營收重算，確認輸入完整且與資料表內推導值一致；此指標沒有第二個獨立來源可比對"
       },
       "verificationStatus": "verified"
     },
@@ -1112,7 +1139,8 @@
           "sourceDebtRatio": 10.225332893460608,
           "totalAssets": 1112443,
           "totalLiabilities": 113751
-        }
+        },
+        "method": "以 MOPS 資產負債表的總負債與總資產重算，確認輸入完整且與資料表內推導值一致；此指標沒有第二個獨立來源可比對"
       },
       "verificationStatus": "verified"
     },
@@ -1141,7 +1169,8 @@
           "tradingDays": 20,
           "windowEnd": "2026-10-08",
           "windowStart": "2026-09-09"
-        }
+        },
+        "method": "窗口內每個市場交易日都必須有該股成交資料"
       },
       "verificationStatus": "verified"
     },
@@ -1171,7 +1200,8 @@
           "revenue": 2617220.0,
           "revenueUnit": "TWD thousand",
           "sourceYoYPct": 105.42
-        }
+        },
+        "method": "以營收重算年增率，並與 MOPS 公布的年增率交叉比對（獨立比對，容差見 config）"
       },
       "verificationStatus": "verified"
     },
@@ -1201,7 +1231,8 @@
           "quarter": "2026Q2",
           "revenueQuarter": 6855431,
           "sourceOperatingMarginQuarter": 46.02793026434078
-        }
+        },
+        "method": "以 MOPS 財報的單季營業利益與單季營收重算，確認輸入完整且與資料表內推導值一致；此指標沒有第二個獨立來源可比對"
       },
       "verificationStatus": "verified"
     },
@@ -1231,7 +1262,8 @@
           "sourceDebtRatio": 16.5375710044656,
           "totalAssets": 44110958,
           "totalLiabilities": 7294881
-        }
+        },
+        "method": "以 MOPS 資產負債表的總負債與總資產重算，確認輸入完整且與資料表內推導值一致；此指標沒有第二個獨立來源可比對"
       },
       "verificationStatus": "verified"
     },
@@ -1260,7 +1292,8 @@
           "tradingDays": 20,
           "windowEnd": "2026-10-08",
           "windowStart": "2026-09-09"
-        }
+        },
+        "method": "窗口內每個市場交易日都必須有該股成交資料"
       },
       "verificationStatus": "verified"
     }
