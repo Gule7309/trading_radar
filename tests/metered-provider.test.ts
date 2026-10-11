@@ -25,6 +25,22 @@ class FixtureProvider implements LlmProvider {
   }
 }
 
+class NoCostFixtureProvider implements LlmProvider {
+  readonly name = "fixture-no-cost";
+
+  async structured<T>(): Promise<StructuredLlmResponse<T>> {
+    return {
+      data: { ok: true } as T,
+      model: "fixture-model",
+      usage: {
+        inputTokens: 1_000_000,
+        outputTokens: 500_000,
+      },
+      latencyMs: 10,
+    };
+  }
+}
+
 describe("MeteredLlmProvider", () => {
   it("aggregates provider-neutral usage by task", async () => {
     const provider = new MeteredLlmProvider(new FixtureProvider());
@@ -54,5 +70,24 @@ describe("MeteredLlmProvider", () => {
         THESIS: 1,
       },
     });
+  });
+
+  it("estimates cost from configured current pricing when the provider does not return cost", async () => {
+    const provider = new MeteredLlmProvider(
+      new NoCostFixtureProvider(),
+      {
+        inputCostPerMillionUsd: 2,
+        outputCostPerMillionUsd: 8,
+      },
+    );
+
+    await provider.structured({
+      task: "VERIFIER",
+      system: "test",
+      input: {},
+      schema: {},
+    });
+
+    expect(provider.snapshot().estimatedCostUsd).toBe(6);
   });
 });
