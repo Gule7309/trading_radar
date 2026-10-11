@@ -106,10 +106,17 @@ def get_candidate_snapshot(
         ranked = sum(1 for item in records if item.rank is not None)
         source_snapshot = _source_snapshot(store, data_version)
 
+        snapshot_serial = int(
+            hashlib.sha256(
+                f"{stock_id}|{data_version}|{periods.as_of_date}".encode("utf-8")
+            ).hexdigest()[:10],
+            16,
+        )
+
         return {
             "schemaVersion": "screening-output-v1",
             "run": {
-                "runId": f"watch-{as_of.isoformat().replace('-', '')}-{stock_id}",
+                "runId": f"{as_of.isoformat().replace('-', '')}-{snapshot_serial}",
                 "runAt": now_iso(),
                 "asOfDate": periods.as_of_date,
                 "priceAsOf": periods.price_as_of,
