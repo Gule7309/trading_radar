@@ -28,6 +28,10 @@ class FixtureScreening implements ScreeningProvider {
       JSON.parse(await readFile(url, "utf8")),
     );
   }
+
+  async inspectTicker(): Promise<ScreeningOutputV1> {
+    return this.screen();
+  }
 }
 
 function researchResult(
