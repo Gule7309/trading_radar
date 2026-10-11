@@ -12,6 +12,7 @@ import {
   type SoftPreferenceWeights,
   type UserFeedback,
   type UserProfile,
+  type UserProfileUpdate,
   UserProfileSchema,
 } from "./types.js";
 
@@ -109,27 +110,26 @@ export class PersonalizationService {
 
   async updateProfile(
     userId: string,
-    input: Partial<
-      Pick<
-        UserProfile,
-        | "investmentHorizon"
-        | "riskTolerance"
-        | "researchStyle"
-        | "hardConstraints"
-        | "softPreferences"
-      >
-    >,
+    input: UserProfileUpdate,
   ): Promise<UserProfile> {
     const current = await this.getOrCreateProfile(userId);
     const now = new Date().toISOString();
+
+    const mergedHardConstraints = {
+      ...current.hardConstraints,
+      ...(input.hardConstraints ?? {}),
+    };
+    const mergedSoftPreferences = {
+      ...current.softPreferences,
+      ...(input.softPreferences ?? {}),
+    };
 
     const next = UserProfileSchema.parse({
       ...current,
       ...input,
       userId,
-      softPreferences: input.softPreferences
-        ? normalizedWeights(input.softPreferences)
-        : current.softPreferences,
+      hardConstraints: mergedHardConstraints,
+      softPreferences: normalizedWeights(mergedSoftPreferences),
       createdAt: current.createdAt,
       updatedAt: now,
     });
