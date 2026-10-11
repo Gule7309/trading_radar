@@ -81,6 +81,31 @@ function result(item: CandidatePacket): ResearchResult {
 }
 
 describe("feedback loop", () => {
+  it("uses research style as the default soft preference unless explicit weights are supplied", async () => {
+    const service = new PersonalizationService(
+      new InMemoryPersonalizationStore(),
+    );
+
+    const growth = await service.updateProfile("u-style", {
+      researchStyle: "GROWTH",
+    });
+
+    expect(growth.softPreferences.growth).toBeGreaterThan(
+      growth.softPreferences.safety,
+    );
+
+    const custom = await service.updateProfile("u-style", {
+      researchStyle: "STABLE",
+      softPreferences: {
+        growth: 0.7,
+        profitability: 0.2,
+        safety: 0.1,
+      },
+    });
+
+    expect(custom.softPreferences.growth).toBeCloseTo(0.7, 8);
+  });
+
   it("merges partial profile patches without resetting other hard constraints", async () => {
     const service = new PersonalizationService(
       new InMemoryPersonalizationStore(),
