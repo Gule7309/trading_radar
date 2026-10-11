@@ -81,6 +81,32 @@ function result(item: CandidatePacket): ResearchResult {
 }
 
 describe("feedback loop", () => {
+  it("merges partial profile patches without resetting other hard constraints", async () => {
+    const service = new PersonalizationService(
+      new InMemoryPersonalizationStore(),
+    );
+
+    await service.updateProfile("u1", {
+      hardConstraints: {
+        excludedIndustries: ["金融業"],
+        minLiquidity: 300_000_000,
+      },
+    });
+
+    const next = await service.updateProfile("u1", {
+      hardConstraints: {
+        maxDebtRatio: 45,
+      },
+    });
+
+    expect(next.hardConstraints).toEqual({
+      excludedIndustries: ["金融業"],
+      maxDebtRatio: 45,
+      minLiquidity: 300_000_000,
+      excludeDisposition: true,
+    });
+  });
+
   it("adjusts only soft preferences and changes the next ranking", async () => {
     // Equal under default balanced weights; one bounded growth-feedback
     // adjustment should make the growth-heavy candidate rank first.
