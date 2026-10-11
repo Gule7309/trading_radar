@@ -213,6 +213,9 @@ Scheduler behavior:
 - after configured hour
 - startup after missed run catches up
 - one successful run per user/local date
+- `taiwan-data screen` builds personalized discovery candidates
+- `taiwan-data inspect` builds fresh single-stock Evidence for saved watchlist theses
+- saved stocks remain monitored even if current discovery hard constraints would exclude them
 - if latest priceAsOf is stale, no "today research ready" notification is sent
 
 ## Existing research APIs
