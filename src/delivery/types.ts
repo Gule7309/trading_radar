@@ -1,4 +1,8 @@
-export type DeliveryRunStatus = "RUNNING" | "SUCCESS" | "FAILED";
+export type DeliveryRunStatus =
+  | "RUNNING"
+  | "WAITING_FOR_FRESH_DATA"
+  | "SUCCESS"
+  | "FAILED";
 
 export interface DailyDeliveryRun {
   deliveryRunId: string;
@@ -6,6 +10,7 @@ export interface DailyDeliveryRun {
   localDate: string;
   status: DeliveryRunStatus;
   screeningRunId?: string;
+  priceAsOf?: string;
   researchCount?: number;
   publishedCount?: number;
   startedAt: string;
