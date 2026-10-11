@@ -1,19 +1,28 @@
+import { readFile } from "node:fs/promises";
 import type { CandidatePacket } from "../domain/candidate.js";
+import {
+  ScreeningOutputV1Schema,
+  type ScreeningOutputV1,
+} from "../domain/screening-output.js";
 import type { ResearchResult } from "../domain/research.js";
-import type {
-  BatchResearchOptions,
-  BatchResearchResult,
-} from "../research/batch-service.js";
 import type { StoredResearchRun } from "../research/store.js";
-import type {
-  ThesisEvent,
-  ThesisVersion,
-} from "../thesis/types.js";
+import { BatchResearchService } from "../research/batch-service.js";
+import { InMemoryThesisStore } from "../thesis/store.js";
+import { ThesisService } from "../thesis/service.js";
+import { ThesisResearchService } from "../thesis/research-service.js";
+import { InMemoryPersonalizationStore } from "../personalization/store.js";
+import { PersonalizationService } from "../personalization/service.js";
+import type { UserProfile } from "../personalization/types.js";
+import { InMemoryNotificationStore } from "../notifications/store.js";
+import { NotificationService } from "../notifications/service.js";
+import { InMemoryWatchlistStore } from "../watchlist/store.js";
+import { WatchlistService } from "../watchlist/service.js";
+import { InMemoryDeliveryRunStore } from "../delivery/store.js";
+import type { ScreeningProvider } from "../delivery/screening-provider.js";
+import { DailyDeliveryService } from "../delivery/service.js";
 import {
   createResearchApi,
-  type BatchResearchApiService,
   type ResearchApiService,
-  type ThesisApiService,
 } from "./research-api.js";
 
 function mockResult(candidate: CandidatePacket): ResearchResult {
@@ -21,11 +30,12 @@ function mockResult(candidate: CandidatePacket): ResearchResult {
   const officialSourceId = `mock-official-${candidate.ticker}`;
   const riskSourceId = `mock-risk-${candidate.ticker}`;
   const coreSignal =
-    candidate.quantSignals.find((signal) => signal.metric === "revenue_yoy") ??
-    candidate.quantSignals[0];
+    candidate.quantSignals.find(
+      (signal) => signal.metric === "revenue_yoy",
+    ) ?? candidate.quantSignals[0];
 
   return {
-    runId: `mock-${candidate.candidateId}`,
+    runId: `mock-${candidate.candidateId}-${Date.now()}`,
     ticker: candidate.ticker,
     companyName: candidate.companyName,
     status: "PUBLISHABLE",
@@ -104,7 +114,8 @@ function mockResult(candidate: CandidatePacket): ResearchResult {
         action: "SEARCH_NEWS",
         actionDetail: "mock downside evidence",
         reasonCode: "MOCK_RISK",
-        decisionSummary: "Collect a mock downside source for UI development.",
+        decisionSummary:
+          "Collect a mock downside source for UI development.",
         tool: "SEARCH_NEWS",
         outcome: "Mock risk source created.",
         createdAt: now,
@@ -157,153 +168,172 @@ class MockResearchService implements ResearchApiService {
   ): Promise<StoredResearchRun[]> {
     return Array.from(this.runs.values())
       .filter((run) => run.ticker === ticker)
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
       .slice(0, limit);
   }
 }
 
-class MockBatchService implements BatchResearchApiService {
-  constructor(private readonly research: MockResearchService) {}
+function personalizedMockScreening(
+  input: ScreeningOutputV1,
+  profile: UserProfile,
+): ScreeningOutputV1 {
+  const weights = profile.softPreferences;
 
-  async run(
-    candidates: CandidatePacket[],
-    options: BatchResearchOptions = {},
-  ): Promise<BatchResearchResult> {
-    const topK = Math.max(1, Math.min(options.topK ?? 5, 20));
-    const completed = await Promise.all(
-      candidates
-        .filter((candidate) => candidate.hardConstraintsPassed)
-        .map(async (candidate) => ({
-          candidate,
-          result: await this.research.run(candidate),
-        })),
-    );
+  const candidates = input.candidates
+    .filter((candidate) => {
+      if (
+        profile.hardConstraints.excludedIndustries.includes(
+          candidate.industry ?? "",
+        )
+      ) {
+        return false;
+      }
 
-    const top = completed
-      .sort(
-        (a, b) =>
-          b.candidate.quantScore - a.candidate.quantScore ||
-          a.candidate.ticker.localeCompare(b.candidate.ticker),
-      )
-      .slice(0, topK)
-      .map(({ candidate, result }, index) => ({
-        rank: index + 1,
-        candidateId: candidate.candidateId,
-        ticker: candidate.ticker,
-        score: candidate.quantScore,
-        quantScore: candidate.quantScore,
-        evidenceQuality: 1,
-        result,
-      }));
+      if (
+        profile.hardConstraints.excludeDisposition &&
+        candidate.riskFlags.includes("disposition")
+      ) {
+        return false;
+      }
 
-    return {
-      researched: completed.length,
-      rejectedOrSkipped: candidates
-        .filter((candidate) => !candidate.hardConstraintsPassed)
-        .map((candidate) => ({
-          candidateId: candidate.candidateId,
-          ticker: candidate.ticker,
-          status: "SKIPPED" as const,
-          stopReason: "HARD_CONSTRAINT_FAILED",
-        })),
-      top,
-    };
-  }
+      if (
+        profile.hardConstraints.maxDebtRatio !== null &&
+        candidate.metrics.debtRatio.value >
+          profile.hardConstraints.maxDebtRatio
+      ) {
+        return false;
+      }
+
+      if (
+        profile.hardConstraints.minLiquidity !== null &&
+        candidate.metrics.avgTurnover20d.value <
+          profile.hardConstraints.minLiquidity
+      ) {
+        return false;
+      }
+
+      return true;
+    })
+    .map((candidate) => {
+      const growth = candidate.metrics.revenueYoY.percentile ?? 0;
+      const profitability =
+        candidate.metrics.operatingMargin.percentile ?? 0;
+      const safety = candidate.metrics.debtRatio.percentile ?? 0;
+      const total =
+        weights.growth +
+        weights.profitability +
+        weights.safety;
+
+      return {
+        ...candidate,
+        quantScore:
+          total > 0
+            ? (growth * weights.growth +
+                profitability * weights.profitability +
+                safety * weights.safety) /
+              total
+            : candidate.quantScore,
+      };
+    })
+    .sort(
+      (a, b) =>
+        b.quantScore - a.quantScore ||
+        a.stockId.localeCompare(b.stockId),
+    )
+    .map((candidate, index) => ({
+      ...candidate,
+      rank: index + 1,
+    }));
+
+  return ScreeningOutputV1Schema.parse({
+    ...input,
+    run: {
+      ...input.run,
+      profile: {
+        excludedIndustries:
+          profile.hardConstraints.excludedIndustries,
+        maxDebtRatio:
+          profile.hardConstraints.maxDebtRatio,
+        minLiquidity:
+          profile.hardConstraints.minLiquidity,
+        excludeDisposition:
+          profile.hardConstraints.excludeDisposition,
+        weights: profile.softPreferences,
+      },
+      counts: {
+        ...input.run.counts,
+        ranked: candidates.length,
+      },
+    },
+    candidates,
+  });
 }
 
-class MockThesisService implements ThesisApiService {
-  private readonly versions = new Map<string, ThesisVersion[]>();
-  private readonly events = new Map<string, ThesisEvent[]>();
-
-  async create(
-    candidate: CandidatePacket,
-    thesisId = `mock-thesis-${candidate.ticker}`,
-  ) {
-    const thesis: ThesisVersion = {
-      thesisId,
-      ticker: candidate.ticker,
-      version: 1,
-      thesisText: `[MOCK] Saved thesis for ${candidate.companyName}.`,
-      status: "ACTIVE",
-      coreClaims: [],
-      supportingClaims: [],
-      risks: [],
-      invalidationConditions: [
-        "[MOCK] Recheck when new material evidence arrives.",
-      ],
-      createdAt: new Date().toISOString(),
-    };
-    this.versions.set(thesisId, [thesis]);
-    this.events.set(thesisId, []);
-
-    return {
-      researchRunId: `mock-${candidate.candidateId}`,
-      thesis,
-    };
-  }
-
-  async recheck(
-    thesisId: string,
-    candidate: CandidatePacket,
-    eventType: ThesisEvent["eventType"] = "MANUAL_RECHECK",
-  ) {
-    const previous = await this.getLatest(thesisId);
-    if (!previous) {
-      throw new Error("MOCK_THESIS_NOT_FOUND");
-    }
-
-    const thesis: ThesisVersion = {
-      ...previous,
-      version: previous.version + 1,
-      status: "UNCHANGED",
-      createdAt: new Date().toISOString(),
-      changeReason: "[MOCK] No material verified change.",
-    };
-    const versions = this.versions.get(thesisId) ?? [];
-    versions.push(thesis);
-    this.versions.set(thesisId, versions);
-
-    const event: ThesisEvent = {
-      eventId: `mock-event-${thesis.version}`,
-      thesisId,
-      ticker: candidate.ticker,
-      occurredAt: thesis.createdAt,
-      eventType,
-      summary: "[MOCK] Thesis recheck completed.",
-      sourceIds: [],
-    };
-    const events = this.events.get(thesisId) ?? [];
-    events.push(event);
-    this.events.set(thesisId, events);
-
-    return {
-      researchRunId: `mock-recheck-${candidate.candidateId}`,
-      thesis,
-    };
-  }
-
-  async getLatest(thesisId: string): Promise<ThesisVersion | null> {
-    const versions = this.versions.get(thesisId) ?? [];
-    return versions.at(-1) ?? null;
-  }
-
-  async listVersions(thesisId: string): Promise<ThesisVersion[]> {
-    return this.versions.get(thesisId) ?? [];
-  }
-
-  async listEvents(thesisId: string): Promise<ThesisEvent[]> {
-    return this.events.get(thesisId) ?? [];
+class MockScreeningProvider implements ScreeningProvider {
+  async screen(profile: UserProfile): Promise<ScreeningOutputV1> {
+    const fixtureUrl = new URL(
+      "../../packages/taiwan_data/tests/fixtures/sample_screening_output.json",
+      import.meta.url,
+    );
+    const raw = JSON.parse(
+      await readFile(fixtureUrl, "utf8"),
+    ) as unknown;
+    const parsed = ScreeningOutputV1Schema.parse(raw);
+    return personalizedMockScreening(parsed, profile);
   }
 }
 
 const research = new MockResearchService();
-const batch = new MockBatchService(research);
-const theses = new MockThesisService();
+const batch = new BatchResearchService(research);
+
+const thesisStore = new InMemoryThesisStore();
+const thesisService = new ThesisService(thesisStore);
+const theses = new ThesisResearchService(
+  research,
+  thesisService,
+);
+
+const personalizationStore =
+  new InMemoryPersonalizationStore();
+const personalization = new PersonalizationService(
+  personalizationStore,
+  research,
+);
+
+const notificationStore =
+  new InMemoryNotificationStore();
+const notifications = new NotificationService(
+  notificationStore,
+);
+
+const watchlistStore = new InMemoryWatchlistStore();
+const watchlist = new WatchlistService(
+  watchlistStore,
+  research,
+  thesisService,
+  theses,
+  notifications,
+);
+
+const delivery = new DailyDeliveryService(
+  new MockScreeningProvider(),
+  personalization,
+  batch,
+  notifications,
+  new InMemoryDeliveryRunStore(),
+);
+
 const port = Number(process.env.PORT ?? "8787");
 
 const server = createResearchApi(research, {
-  corsOrigin: process.env.CORS_ORIGIN ?? "http://localhost:5173",
+  corsOrigin:
+    process.env.CORS_ORIGIN ?? "http://localhost:5173",
   batch,
   theses,
+  personalization,
+  watchlist,
+  notifications,
+  delivery,
 });
 
 server.listen(port, "127.0.0.1", () => {
@@ -312,7 +342,12 @@ server.listen(port, "127.0.0.1", () => {
       service: "trading-radar-b-mock",
       listening: `http://127.0.0.1:${port}`,
       mock: true,
-      note: "No Gemini/OpenAI key is required. All research content is mock data.",
+      personalization: true,
+      watchlist: true,
+      notifications: true,
+      proactiveDelivery: true,
+      note:
+        "No Gemini/OpenAI key is required. Research content is mock data; the Data PR #5 screening fixture is real-shaped.",
     }),
   );
 });
