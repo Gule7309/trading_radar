@@ -93,6 +93,17 @@ function delta(
   };
 }
 
+function weightsChanged(
+  before: SoftPreferenceWeights,
+  after: SoftPreferenceWeights,
+): boolean {
+  return (
+    Math.abs(before.growth - after.growth) > 1e-12 ||
+    Math.abs(before.profitability - after.profitability) > 1e-12 ||
+    Math.abs(before.safety - after.safety) > 1e-12
+  );
+}
+
 export class PersonalizationService {
   constructor(
     private readonly store: PersonalizationStore,
@@ -140,15 +151,63 @@ export class PersonalizationService {
       updatedAt: now,
     });
 
+    if (
+      weightsChanged(
+        current.softPreferences,
+        next.softPreferences,
+      )
+    ) {
+      await this.store.appendPreferenceChange({
+        changeId: randomUUID(),
+        userId,
+        source: "MANUAL",
+        before: current.softPreferences,
+        after: next.softPreferences,
+        delta: delta(
+          current.softPreferences,
+          next.softPreferences,
+        ),
+        reason: input.researchStyle
+          ? `Manual research-style update to ${input.researchStyle}.`
+          : "Manual soft-preference update.",
+        createdAt: now,
+      });
+    }
+
     await this.store.saveProfile(next);
     return next;
   }
 
-  async resetSoftPreferences(userId: string): Promise<UserProfile> {
+  async resetSoftPreferences(
+    userId: string,
+  ): Promise<UserProfile> {
     const current = await this.getOrCreateProfile(userId);
-    return this.updateProfile(userId, {
-      softPreferences: defaultSoftPreferences(current.researchStyle),
+    const now = new Date().toISOString();
+    const after = defaultSoftPreferences(
+      current.researchStyle,
+    );
+    const next = UserProfileSchema.parse({
+      ...current,
+      softPreferences: after,
+      updatedAt: now,
     });
+
+    if (weightsChanged(current.softPreferences, after)) {
+      await this.store.appendPreferenceChange({
+        changeId: randomUUID(),
+        userId,
+        source: "RESET",
+        before: current.softPreferences,
+        after,
+        delta: delta(current.softPreferences, after),
+        reason:
+          "User reset soft preferences to the current research-style default.",
+        createdAt: now,
+      });
+    }
+
+    await this.store.saveProfile(next);
+    return next;
   }
 
   async recordFeedback(
@@ -198,6 +257,7 @@ export class PersonalizationService {
     const preferenceChange: PreferenceChange = {
       changeId: randomUUID(),
       userId,
+      source: "FEEDBACK",
       feedbackId,
       before: current.softPreferences,
       after,
