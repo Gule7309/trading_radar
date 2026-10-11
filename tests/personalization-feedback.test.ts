@@ -82,8 +82,10 @@ function result(item: CandidatePacket): ResearchResult {
 
 describe("feedback loop", () => {
   it("adjusts only soft preferences and changes the next ranking", async () => {
-    const growthStock = candidate("a", "1111", 95, 30, 30);
-    const qualityStock = candidate("b", "2222", 30, 95, 95);
+    // Equal under default balanced weights; one bounded growth-feedback
+    // adjustment should make the growth-heavy candidate rank first.
+    const growthStock = candidate("a", "1111", 90, 50, 50);
+    const qualityStock = candidate("b", "2222", 50, 70, 70);
     const run: StoredResearchRun = {
       runId: "run-1111",
       ticker: "1111",
