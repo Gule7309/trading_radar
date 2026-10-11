@@ -49,9 +49,9 @@ class FixtureResearch implements ResearchApiService {
       runId,
       ticker: candidate.ticker,
       companyName: candidate.companyName,
-      status: "PUBLISHABLE",
-      decision: "KEEP",
-      thesis: refuted ? "Updated thesis" : "Initial thesis",
+      status: refuted ? "REJECTED" : "PUBLISHABLE",
+      decision: refuted ? "REJECT" : "KEEP",
+      thesis: refuted ? undefined : "Initial thesis",
       keyReasons: ["Reason"],
       claims: [
         {
@@ -99,7 +99,7 @@ class FixtureResearch implements ResearchApiService {
         freshness: "CURRENT",
       },
       researchTrace: [],
-      stopReason: "PUBLISHED",
+      stopReason: refuted ? "INSUFFICIENT_EVIDENCE" : "PUBLISHED",
       startedAt: now,
       completedAt: now,
     };
