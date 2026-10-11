@@ -127,6 +127,12 @@ export interface DeliveryApiService {
   listRuns(userId: string, limit?: number): Promise<DailyDeliveryRun[]>;
 }
 
+export interface AdminApiService {
+  status(): Promise<unknown>;
+  modelCheck(): Promise<unknown>;
+  dataStatus(): Promise<unknown>;
+}
+
 export interface ApiOptions {
   corsOrigin?: string;
   maxBodyBytes?: number;
@@ -136,6 +142,7 @@ export interface ApiOptions {
   watchlist?: WatchlistApiService;
   notifications?: NotificationApiService;
   delivery?: DeliveryApiService;
+  admin?: AdminApiService;
 }
 
 function json(
@@ -268,6 +275,7 @@ export function createResearchApi(
   const watchlist = options.watchlist;
   const notifications = options.notifications;
   const delivery = options.delivery;
+  const admin = options.admin;
 
   return createServer(async (request, response) => {
     if (!request.url || !request.method) {
@@ -308,7 +316,68 @@ export function createResearchApi(
             watchlist: Boolean(watchlist),
             notifications: Boolean(notifications),
             proactiveDelivery: Boolean(delivery),
+            admin: Boolean(admin),
           },
+          corsOrigin,
+        );
+      }
+
+      if (
+        request.method === "GET" &&
+        url.pathname === "/api/admin/status"
+      ) {
+        if (!admin) {
+          return json(
+            response,
+            501,
+            { error: "ADMIN_API_DISABLED" },
+            corsOrigin,
+          );
+        }
+        return json(
+          response,
+          200,
+          await admin.status(),
+          corsOrigin,
+        );
+      }
+
+      if (
+        request.method === "POST" &&
+        url.pathname === "/api/admin/model-check"
+      ) {
+        if (!admin) {
+          return json(
+            response,
+            501,
+            { error: "ADMIN_API_DISABLED" },
+            corsOrigin,
+          );
+        }
+        return json(
+          response,
+          200,
+          await admin.modelCheck(),
+          corsOrigin,
+        );
+      }
+
+      if (
+        request.method === "GET" &&
+        url.pathname === "/api/admin/data-status"
+      ) {
+        if (!admin) {
+          return json(
+            response,
+            501,
+            { error: "ADMIN_API_DISABLED" },
+            corsOrigin,
+          );
+        }
+        return json(
+          response,
+          200,
+          await admin.dataStatus(),
           corsOrigin,
         );
       }
