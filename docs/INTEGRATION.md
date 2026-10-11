@@ -1,41 +1,34 @@
 # Integration Guide
 
-## Current boundary
+## Product loop
 
-The repository now has a concrete A -> B contract from Data PR #5:
+The current MVP contract follows the original competition flow:
 
 ```text
-screening-output-v1
-  candidates[]
-  evidence[]
-  riskFlags
-  dataVersion / sourceSnapshot
-        ↓
-B screening adapter
-        ↓
-CandidatePacket + upstreamEvidence
-        ↓
-dynamic research / verification / thesis
-        ↓
-ResearchResult / Top-K
-        ↓
-C frontend
+User Profile
+→ A screening-output-v1
+→ B evidence-grounded research
+→ Top-K
+→ SAVE / SKIP feedback
+→ bounded Soft Preference update
+→ next ranking
+→ SAVE creates Watchlist + Thesis
+→ recheck
+→ Thesis Changed / Evidence Conflict notification
 ```
 
-B preserves A's quantitative evidence lineage instead of throwing it away and re-fetching the same facts.
+Hard constraints are never changed by behavior feedback.
 
 ## Start B
 
-### Frontend / contract development without model credentials
+Mock / C development:
 
 ```bash
 npm install
 npm run api:mock
 ```
 
-No Gemini/OpenAI key is required.
-
-### Real current runtime
+Real current model runtime:
 
 ```bash
 npm run api
@@ -47,30 +40,43 @@ Default:
 http://127.0.0.1:8787
 ```
 
-Environment:
+Keys remain backend-only.
 
-```env
-GEMINI_API_KEY=...
-LLM_PROVIDER=gemini
-SEARCH_PROVIDER=gemini-google-search
-PORT=8787
-CORS_ORIGIN=http://localhost:5173
-SQLITE_PATH=trading-radar.sqlite
+## User profile
+
+```http
+GET /api/users/:userId/profile
+PUT /api/users/:userId/profile
+POST /api/users/:userId/profile/reset-soft
+GET /api/users/:userId/screening-profile
 ```
 
-Provider credentials stay on the backend. C should never call Gemini/OpenAI directly.
+Hard constraints:
 
-## A screening output -> B research (preferred integration)
+- excludedIndustries
+- maxDebtRatio
+- minLiquidity
+- excludeDisposition
+
+Soft preferences:
+
+- growth
+- profitability
+- safety
+
+## A -> B research
+
+Preferred:
 
 ```http
 POST /api/research/screening-output
-Content-Type: application/json
 ```
 
 Request:
 
 ```json
 {
+  "userId": "demo-user",
   "screeningOutput": {
     "schemaVersion": "screening-output-v1",
     "run": {},
@@ -81,113 +87,61 @@ Request:
   "options": {
     "topK": 5,
     "researchLimit": 10,
-    "concurrency": 2,
-    "rankingWeights": {
-      "quant": 0.6,
-      "evidence": 0.4
-    }
+    "concurrency": 2
   }
 }
 ```
 
-B validates the Data Layer v1 contract, adapts the candidates internally, and returns:
+B preserves A Evidence lineage and, when userId is supplied, applies current soft preferences before B batch research.
+
+A percentile is 0–1; B's CandidatePacket signal percentile is normalized to 0–100.
+
+## Feedback
+
+```http
+POST /api/users/:userId/feedback
+```
+
+SAVE:
 
 ```json
 {
-  "screeningRunId": "20261010-001",
-  "dataVersion": "ds-...",
-  "sourceSnapshot": "sha256:...",
-  "researched": 10,
-  "rejectedOrSkipped": [],
-  "top": []
+  "runId": "research-run-id",
+  "action": "SAVE",
+  "reasons": ["GROWTH"]
 }
 ```
 
-Important adapter behavior:
-
-- A percentile is 0–1; B's existing signal field is normalized to 0–100.
-- A `riskFlags` are preserved.
-- verified A Evidence is preserved as `upstreamEvidence`.
-- A's official evidence becomes Tier-1 B source material.
-- B does not repeat the same monthly-revenue lookup when A already supplied verified monthly-revenue evidence.
-- non-verified A evidence is rejected by the adapter rather than silently trusted.
-
-## Internal CandidatePacket
-
-Direct single-candidate / custom integrations may still use `CandidatePacket`:
+SKIP:
 
 ```json
 {
-  "candidateId": "20261010-001:2330",
-  "ticker": "2330",
-  "companyName": "台積電",
-  "market": "TWSE",
-  "industry": "半導體業",
-  "asOf": "2026-10-10",
-  "quantScore": 0.91,
-  "quantSignals": [
-    {
-      "metric": "revenue_yoy",
-      "value": 53.32,
-      "period": "2026-08",
-      "industryPercentile": 95
-    }
-  ],
-  "hardConstraintsPassed": true,
-  "riskFlags": ["notice"],
-  "upstreamEvidence": []
+  "runId": "research-run-id",
+  "action": "SKIP",
+  "reasons": ["HIGH_VOLATILITY"]
 }
 ```
 
-A owns screening hard constraints. B never auto-relaxes them.
+Feedback changes only bounded soft weights.
 
-## Single candidate research
+SAVE automatically creates a watchlist item + Thesis from the already completed publishable ResearchResult; it does not repeat the same research.
 
-```http
-POST /api/research/runs
-Content-Type: application/json
-```
-
-Body = one `CandidatePacket`.
-
-## Batch CandidatePacket research
+History:
 
 ```http
-POST /api/research/batch
-Content-Type: application/json
+GET /api/users/:userId/feedback
+GET /api/users/:userId/preference-history
 ```
 
-For new A integrations, prefer `/api/research/screening-output` so Evidence lineage is not lost.
-
-## Research history
+## Watchlist / Thesis
 
 ```http
-GET /api/research/runs/:runId
-GET /api/research/tickers/:ticker/runs?limit=20
+GET /api/users/:userId/watchlist
+DELETE /api/users/:userId/watchlist/:ticker
+POST /api/users/:userId/watchlist/:ticker/recheck
 ```
 
-## Thesis creation
-
-```http
-POST /api/theses
-Content-Type: application/json
-```
-
-```json
-{
-  "candidate": {},
-  "thesisId": "optional-client-id"
-}
-```
-
-A thesis is created only from a publishable research result.
-
-## Thesis recheck
-
-```http
-POST /api/theses/:thesisId/recheck
-Content-Type: application/json
-```
+Recheck body:
 
 ```json
 {
@@ -196,87 +150,103 @@ Content-Type: application/json
 }
 ```
 
-Supported event types:
+Thesis status:
 
-- `MONTHLY_REVENUE`
-- `MATERIAL_DISCLOSURE`
-- `NEWS`
-- `MANUAL_RECHECK`
+- ACTIVE
+- STRENGTHENED
+- UNCHANGED
+- WEAKENED
+- INVALIDATED
 
-## Thesis history
+A rejected recheck does not automatically mean unchanged: verified negative evidence against a previous core claim can still weaken or invalidate the saved Thesis.
+
+## Notifications
 
 ```http
+GET /api/users/:userId/notifications
+GET /api/users/:userId/notifications?unread=1
+POST /api/users/:userId/notifications/:notificationId/read
+```
+
+Types:
+
+- DAILY_RESEARCH_READY
+- THESIS_CHANGED
+- EVIDENCE_CONFLICT
+
+Backend owns event detection + persistence. C owns Browser Notification presentation.
+
+## Proactive daily research
+
+Manual/demo trigger:
+
+```http
+POST /api/users/:userId/daily-research
+```
+
+History:
+
+```http
+GET /api/users/:userId/delivery-runs
+```
+
+Real automatic mode:
+
+```env
+TAIWAN_DATA_DB=/path/to/data.sqlite
+TAIWAN_DATA_CLI=taiwan-data
+ENABLE_DAILY_SCHEDULER=true
+DAILY_RESEARCH_AFTER_HOUR=17
+DAILY_SCHEDULER_INTERVAL_MS=3600000
+```
+
+Install Data CLI first:
+
+```bash
+python -m pip install -e "packages/taiwan_data"
+```
+
+Scheduler behavior:
+
+- Asia/Taipei
+- Mon–Fri
+- after configured hour
+- startup after missed run catches up
+- one successful run per user/local date
+- if latest priceAsOf is stale, no "today research ready" notification is sent
+
+## Existing research APIs
+
+```http
+POST /api/research/runs
+POST /api/research/batch
+GET /api/research/runs/:runId
+GET /api/research/tickers/:ticker/runs?limit=20
+```
+
+Existing thesis APIs remain available:
+
+```http
+POST /api/theses
+POST /api/theses/:thesisId/recheck
 GET /api/theses/:thesisId
 GET /api/theses/:thesisId/versions
 GET /api/theses/:thesisId/events
 ```
 
-## B -> C ResearchResult mapping
+## C contract
 
-Recommended C fields:
-
-- `status`: PUBLISHABLE / REJECTED / PARTIAL
-- `decision`: KEEP / REJECT
-- `thesis`
-- `keyReasons`
-- `claims[].status`
-- `claims[].category`
-- `claims[].importance`
-- `claims[].sourceIds`
-- `risks`
-- `invalidationConditions`
-- `sources`
-- `verificationSummary.coreClaimCoverage`
-- `verificationSummary.primarySourceRatio`
-- `verificationSummary.unresolvedConflicts`
-- `verificationSummary.freshness`
-- `researchTrace`
-- `stopReason`
-
-Development-only:
-
-- `metrics.llmCalls`
-- `metrics.inputTokens`
-- `metrics.outputTokens`
-- `metrics.llmLatencyMs`
-- `metrics.totalLatencyMs`
-- `metrics.estimatedCostUsd`
-
-Do not render metrics or internal ranking scores as a probability that the stock will rise.
-
-## Source UI
-
-For each claim/risk, C maps `sourceIds` into `sources` and may display:
-
-- title
-- publisher
-- source type
-- published date
-- data period
-- source tier
-- URL
-
-Tier-3 search snippets should not appear as verified evidence cards.
-
-## Trace UI
-
-`researchTrace` can power an expandable operational timeline.
-
-Do not display hidden chain-of-thought. Only structured action summaries/reason codes are stored.
-
-## Frontend timing
-
-C can start immediately using `npm run api:mock`.
-
-See `docs/FRONTEND_HANDOFF.md`.
-
-## Provider migration
-
-The provider boundary is:
+Shared TypeScript types:
 
 ```text
-LlmProvider -> controller/extractor/verifier/skeptic/thesis
-SearchProvider -> discovery
+src/api/contracts.ts
 ```
 
-Gemini is the current development runtime. Later OpenAI migration is an adapter/configuration change, not an A/B/C contract rewrite.
+C should render ResearchResult, not recreate B policy.
+
+Do not present quantScore / evidenceQuality / internal score as price-up probability.
+
+See:
+
+- `docs/C_FRONTEND_HANDOFF.md`
+- `docs/data/candidate-evidence-contract.md`
