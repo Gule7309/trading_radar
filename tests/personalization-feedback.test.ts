@@ -104,6 +104,14 @@ describe("feedback loop", () => {
     });
 
     expect(custom.softPreferences.growth).toBeCloseTo(0.7, 8);
+
+    const history = await service.listPreferenceChanges("u-style");
+    expect(history.some((item) => item.source === "MANUAL")).toBe(true);
+
+    await service.resetSoftPreferences("u-style");
+    const resetHistory =
+      await service.listPreferenceChanges("u-style");
+    expect(resetHistory.some((item) => item.source === "RESET")).toBe(true);
   });
 
   it("merges partial profile patches without resetting other hard constraints", async () => {
