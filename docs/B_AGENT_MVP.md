@@ -62,20 +62,41 @@ Top-K evidence-aware ranking
 C UI / Thesis tracker
 ```
 
-Saved stock flow:
+Personalization / proactive loop:
 
 ```text
-ResearchResult
+User Profile
   ↓
-Thesis v1
+Hard Constraints + Soft Preferences
   ↓
-new monthly revenue / disclosure / manual recheck
+A screening + B research
+  ↓
+Daily Top-K
+  ↓
+SAVE / SKIP + reason
+  ↓
+bounded Soft Preference update
+  ↓
+next ranking changes
+  ↺
+```
+
+Saved stock / proactive monitoring:
+
+```text
+SAVE publishable research
+  ↓
+Watchlist + Thesis v1
+  ↓
+new monthly revenue / disclosure / news / manual recheck
   ↓
 new ResearchResult
   ↓
 ACTIVE / STRENGTHENED / UNCHANGED / WEAKENED / INVALIDATED
   ↓
 Thesis v2 + event history
+  ↓
+THESIS_CHANGED / EVIDENCE_CONFLICT notification
 ```
 
 ## 3. Provider strategy
@@ -264,7 +285,8 @@ Recheck behavior:
 - conflicting / insufficient previous core claim → `WEAKENED`
 - new supported core claim → `STRENGTHENED`
 - no material verified change → `UNCHANGED`
-- non-publishable recheck → preserve prior thesis and record `UNCHANGED` with an explicit reason
+- non-publishable recheck with no verified material change → preserve prior thesis as `UNCHANGED`
+- non-publishable recheck containing verified refutation/conflict of prior core claims → `WEAKENED` / `INVALIDATED`
 
 Thesis versions and events are persisted in SQLite.
 
@@ -276,6 +298,12 @@ SQLite currently stores:
 - full `ResearchResult`
 - thesis versions
 - thesis events
+- user profiles
+- feedback
+- preference-change history
+- watchlist
+- notifications
+- daily delivery runs
 
 Local file default:
 
@@ -314,6 +342,24 @@ Thesis:
 - `GET /api/theses/:thesisId`
 - `GET /api/theses/:thesisId/versions`
 - `GET /api/theses/:thesisId/events`
+
+Personalization / engagement:
+
+- `GET|PUT /api/users/:userId/profile`
+- `POST /api/users/:userId/profile/reset-soft`
+- `GET /api/users/:userId/screening-profile`
+- `GET|POST /api/users/:userId/feedback`
+- `GET /api/users/:userId/preference-history`
+- `GET /api/users/:userId/watchlist`
+- `DELETE /api/users/:userId/watchlist/:ticker`
+- `POST /api/users/:userId/watchlist/:ticker/recheck`
+
+Notifications / proactive delivery:
+
+- `GET /api/users/:userId/notifications`
+- `POST /api/users/:userId/notifications/:notificationId/read`
+- `POST /api/users/:userId/daily-research`
+- `GET /api/users/:userId/delivery-runs`
 
 See `docs/INTEGRATION.md`.
 
@@ -402,6 +448,16 @@ Live semantic E01–E10 evaluation is intentionally separate from deterministic 
 
 ### P1 — implemented for MVP
 
+- deterministic user profile + hard/soft preferences
+- SAVE / SKIP feedback with bounded soft-weight adjustment
+- preference-change history + reset
+- feedback-aware next ranking
+- SAVE → watchlist + thesis creation without duplicate research
+- thesis recheck notifications
+- notification center
+- workday after-hours scheduler
+- missed-run catch-up
+- stale-price guard before "today" delivery
 - conflict handling
 - conditional skeptic
 - thesis compiler
@@ -448,6 +504,15 @@ Static MVP DoD is satisfied when:
 - A candidate list can produce a deterministic Top-K output.
 - the exact Data Layer `screening-output-v1` contract can enter B without losing Evidence lineage.
 - C can develop against a credential-free mock server using the same HTTP contract.
+- user profile / hard constraints / soft preferences persist.
+- SAVE / SKIP feedback is stored with explicit reasons.
+- feedback can change only soft ranking weights, never hard constraints.
+- the next ranking can reflect changed soft preferences.
+- SAVE creates a watchlist item and Thesis without repeating the same completed research.
+- thesis recheck can generate WEAKENED / INVALIDATED from verified negative evidence.
+- Daily Research Ready / Thesis Changed / Evidence Conflict notifications persist.
+- weekday after-hours delivery supports catch-up after a missed local run.
+- stale market data is not mislabeled as today's research.
 
 ## 19. Remaining live-only validation
 
@@ -455,8 +520,10 @@ The code can continue without user interaction up to this point. Remaining valid
 
 1. rerun the current live Gemini path using a real `screening-output-v1` document after upstream-evidence ingestion;
 2. run repeated live semantic E01–E10 cases and record pass rate/latency/tokens;
-3. perform one C-side real API consumption check after mock UI development;
-4. when switching providers, choose the production OpenAI model/credential setup and add the OpenAI adapter.
+3. C implements Browser Notification and validates the full profile → feedback → ranking → watchlist → notification UI loop;
+4. perform one C-side real API consumption check after mock UI development;
+5. run the required 3–5 user validation sessions and record research-time / traceability / risk / citation metrics;
+6. when switching providers, choose the production OpenAI model/credential setup and add the OpenAI adapter.
 
 These are runtime/provider validation tasks, not missing core MVP architecture.
 
