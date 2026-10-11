@@ -92,23 +92,33 @@ export class CliScreeningProvider implements ScreeningProvider {
 
   async screen(
     profile: UserProfile,
-    options: { limit?: number } = {},
+    options: {
+      limit?: number;
+      asOfDate?: string;
+    } = {},
   ): Promise<ScreeningOutputV1> {
     return this.runCommand(profile, [
       "screen",
       "--limit",
       String(Math.max(1, Math.min(options.limit ?? 20, 50))),
+      ...(options.asOfDate
+        ? ["--as-of", options.asOfDate]
+        : []),
     ]);
   }
 
   async inspectTicker(
     profile: UserProfile,
     ticker: string,
+    options: { asOfDate?: string } = {},
   ): Promise<ScreeningOutputV1> {
     return this.runCommand(profile, [
       "inspect",
       "--stock-id",
       ticker,
+      ...(options.asOfDate
+        ? ["--as-of", options.asOfDate]
+        : []),
     ]);
   }
 
