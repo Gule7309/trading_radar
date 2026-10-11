@@ -105,7 +105,8 @@ B docs:
 
 - `docs/B_AGENT_MVP.md` — architecture, policies, status, DoD
 - `docs/INTEGRATION.md` — A/B/C contracts and API usage
-- `docs/C_FRONTEND_HANDOFF.md` — **C start here**: exact backend setup, API usage, UI/error/timeout/CORS notes
+- `docs/C_FRONTEND_HANDOFF.md` — **C start here**: exact backend setup, profile/feedback/watchlist/notification APIs, UI/error/timeout/CORS notes
+- `docs/ORIGINAL_MVP_CHECKLIST.md` — original competition scope and current completion status
 - `docs/FRONTEND_HANDOFF.md` — earlier frontend notes (superseded by C_FRONTEND_HANDOFF for day-to-day integration)
 
 ## A — Taiwan data layer
