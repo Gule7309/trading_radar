@@ -13,6 +13,8 @@ export interface DailyDeliveryRun {
   priceAsOf?: string;
   researchCount?: number;
   publishedCount?: number;
+  watchlistRechecked?: number;
+  watchlistRecheckFailed?: number;
   startedAt: string;
   completedAt?: string;
   error?: string;
