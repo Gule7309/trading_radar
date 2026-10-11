@@ -63,6 +63,26 @@ export class DailyDeliveryService {
       const output = await this.screening.screen(profile, {
         limit: options.screeningLimit ?? 20,
       });
+      if (!options.force && output.run.priceAsOf !== localDate) {
+        const waiting: DailyDeliveryRun = {
+          ...deliveryRun,
+          status: "WAITING_FOR_FRESH_DATA",
+          screeningRunId: output.run.runId,
+          priceAsOf: output.run.priceAsOf,
+          completedAt: new Date().toISOString(),
+          error:
+            `Latest market data is ${output.run.priceAsOf}; local date is ${localDate}. No daily notification was sent.`,
+        };
+        await this.store.save(waiting);
+
+        return {
+          reused: false,
+          waitingForFreshData: true,
+          deliveryRun: waiting,
+          screeningOutput: output,
+        };
+      }
+
       const candidates =
         screeningOutputToCandidatePackets(output);
 
@@ -76,6 +96,7 @@ export class DailyDeliveryService {
         ...deliveryRun,
         status: "SUCCESS",
         screeningRunId: output.run.runId,
+        priceAsOf: output.run.priceAsOf,
         researchCount: result.researched,
         publishedCount: result.top.length,
         completedAt: new Date().toISOString(),
