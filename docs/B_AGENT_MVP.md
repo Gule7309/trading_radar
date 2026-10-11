@@ -457,6 +457,8 @@ Live semantic E01–E10 evaluation is intentionally separate from deterministic 
 - notification center
 - workday after-hours scheduler
 - missed-run catch-up
+- Data Layer single-stock `inspect` snapshot for saved-thesis monitoring
+- scheduled watchlist recheck
 - stale-price guard before "today" delivery
 - conflict handling
 - conditional skeptic
@@ -512,6 +514,8 @@ Static MVP DoD is satisfied when:
 - thesis recheck can generate WEAKENED / INVALIDATED from verified negative evidence.
 - Daily Research Ready / Thesis Changed / Evidence Conflict notifications persist.
 - weekday after-hours delivery supports catch-up after a missed local run.
+- saved watchlist stocks are rechecked from fresh single-stock quantitative Evidence during delivery.
+- discovery hard constraints do not silently stop monitoring an already saved stock.
 - stale market data is not mislabeled as today's research.
 
 ## 19. Remaining live-only validation
