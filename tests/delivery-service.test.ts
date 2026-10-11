@@ -107,6 +107,7 @@ describe("DailyDeliveryService", () => {
     );
 
     const first = await delivery.runForUser("u1", {
+      force: true,
       screeningLimit: 2,
       researchLimit: 1,
       topK: 1,
