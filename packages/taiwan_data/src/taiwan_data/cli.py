@@ -83,6 +83,7 @@ def build_parser() -> argparse.ArgumentParser:
     inspect.add_argument("--output", help="輸出 JSON 路徑；省略則印到 stdout")
     inspect.add_argument("--as-of", type=_date, help="預設為今天（Asia/Taipei）")
     inspect.add_argument("--profile", help="Profile JSON 檔（只使用 soft weights；hard constraints 不套用）")
+    inspect.add_argument("--config", help="Config JSON 檔（覆寫系統參數）")
 
     snapshot = sub.add_parser("snapshot", help="建立可分發的壓縮快照（full 或 demo）與 manifest")
     snapshot.add_argument("--db", default=os.getenv(DEFAULT_DB_ENV))
@@ -133,11 +134,13 @@ def main(argv: list[str] | None = None) -> None:
         if not args.db:
             raise ValueError(f"請用 --db 或 {DEFAULT_DB_ENV} 指定 SQLite 路徑")
         profile_data = json.loads(Path(args.profile).read_text(encoding="utf-8")) if args.profile else {}
+        config_data = json.loads(Path(args.config).read_text(encoding="utf-8")) if args.config else {}
         result = get_candidate_snapshot(
             DataStore(args.db),
             args.stock_id,
             Profile.from_dict(profile_data),
             as_of_date=args.as_of,
+            config=ScreeningConfig.from_dict(config_data),
         )
         if args.output is None:
             print(json.dumps(result, ensure_ascii=False, indent=2))
