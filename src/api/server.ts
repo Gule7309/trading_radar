@@ -17,6 +17,7 @@ import { SqliteDeliveryRunStore } from "../delivery/sqlite-store.js";
 import { CliScreeningProvider } from "../delivery/cli-screening-provider.js";
 import { DailyDeliveryService } from "../delivery/service.js";
 import { DailyResearchScheduler } from "../delivery/scheduler.js";
+import { AdminService } from "../admin/service.js";
 import { createResearchApi } from "./research-api.js";
 
 try {
@@ -106,6 +107,13 @@ if (process.env.TAIWAN_DATA_DB) {
   }
 }
 
+const admin = new AdminService(
+  providers.llm,
+  providers.search,
+  personalization,
+  delivery,
+);
+
 const server = createResearchApi(research, {
   corsOrigin:
     process.env.CORS_ORIGIN ?? "http://localhost:5173",
@@ -115,6 +123,7 @@ const server = createResearchApi(research, {
   watchlist,
   notifications,
   delivery,
+  admin,
 });
 
 const port = Number(process.env.PORT ?? "8787");
