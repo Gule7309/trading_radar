@@ -636,6 +636,14 @@ def test_single_stock_snapshot_supports_saved_thesis_monitoring(store, tmp_path)
         json.dumps(profile.to_dict(), ensure_ascii=False),
         encoding="utf-8",
     )
+    inspect_config_path = tmp_path / "inspect-config.json"
+    inspect_config_path.write_text(
+        json.dumps({
+            "financialCoverageThreshold": 0.9,
+            "priceCoverageThreshold": 0.9,
+        }),
+        encoding="utf-8",
+    )
 
     cli.main([
         "inspect",
@@ -647,6 +655,8 @@ def test_single_stock_snapshot_supports_saved_thesis_monitoring(store, tmp_path)
         "2026-10-10",
         "--profile",
         str(profile_path),
+        "--config",
+        str(inspect_config_path),
         "--output",
         str(output),
     ])
