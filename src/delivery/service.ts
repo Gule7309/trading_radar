@@ -83,7 +83,7 @@ export class DailyDeliveryService {
           userId,
           item.ticker,
           candidate,
-          "MONTHLY_REVENUE",
+          "MANUAL_RECHECK",
         );
         rechecked += 1;
         results.push({
