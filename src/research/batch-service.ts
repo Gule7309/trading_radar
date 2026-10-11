@@ -52,7 +52,9 @@ async function mapWithConcurrency<T, R>(
 }
 
 export class BatchResearchService {
-  constructor(private readonly research: ResearchService) {}
+  constructor(
+    private readonly research: Pick<ResearchService, "run">,
+  ) {}
 
   async run(
     candidates: CandidatePacket[],
