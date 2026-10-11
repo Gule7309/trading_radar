@@ -13,7 +13,7 @@ from .config import Profile, ScreeningConfig, ScreeningError
 from .evidence import METRIC_KEYS, SourceRegistry, build_evidence
 from .metrics import Periods, load_records, resolve_periods
 from .ranking import rank_records
-from .store import find_run, load_output as _load_output, next_run_id, save_run
+from .store import camel, find_run, load_output as _load_output, next_run_id, save_run
 
 
 def get_candidates(
@@ -31,6 +31,150 @@ def get_candidates(
         raise ValueError(f"limit 必須介於 1 與 evidence_top_k（{config.evidence_top_k}）之間")
     run_id = run_screening(store, profile, as_of_date=as_of_date, config=config, reuse=reuse)
     return load_output(store, run_id, limit=limit)
+
+
+def get_candidate_snapshot(
+    store: DataStore,
+    stock_id: str,
+    profile: Profile | None = None,
+    *,
+    as_of_date: date | str | None = None,
+    config: ScreeningConfig | None = None,
+) -> dict[str, Any]:
+    """Return one base-eligible stock with fresh verified quantitative Evidence.
+
+    This is for saved-thesis monitoring. User hard constraints are intentionally
+    not applied: a saved stock must still be re-evaluated even if it would no
+    longer pass the current discovery filter. Soft weights are preserved only
+    for its contextual quantScore.
+    """
+    profile, config = profile or Profile(), config or ScreeningConfig()
+    as_of = _as_date(as_of_date)
+    store.ensure_schema()
+
+    watch_profile = Profile(
+        excluded_industries=(),
+        max_debt_ratio=None,
+        min_liquidity=0,
+        exclude_disposition=False,
+        weights=profile.weights,
+    )
+
+    with closing(store.connect()) as conn:
+        periods = resolve_periods(conn, as_of, config)
+        data_version = dataset_status_digest(conn)
+        records = load_records(conn, periods, config, as_of)
+        base_eligible = rank_records(records, watch_profile, config)
+
+        record = next((item for item in records if item.stock_id == stock_id), None)
+        if record is None:
+            raise KeyError(f"找不到股票：{stock_id}")
+        if record.exclusion_reason is not None or record.rank is None:
+            raise ScreeningError(
+                f"{stock_id} 無法建立可驗證 snapshot：{record.exclusion_reason or 'not_ranked'}"
+            )
+
+        registry = SourceRegistry(conn)
+        evidence = [
+            build_evidence(record, metric, f"ev-{index:03d}", periods, registry)
+            for index, metric in enumerate(METRIC_KEYS, start=1)
+        ]
+        evidence_by_metric = {item.metric: item.id for item in evidence}
+
+        factor_key = {
+            "revenue_yoy": "growth",
+            "operating_margin": "profitability",
+            "debt_ratio": "safety",
+        }
+        metrics = {}
+        for metric, output_key in METRIC_KEYS.items():
+            metrics[output_key] = {
+                "value": record.metrics[metric].value,
+                "percentile": (
+                    record.percentiles[factor_key[metric]]
+                    if metric in factor_key
+                    else None
+                ),
+                "evidenceId": evidence_by_metric[output_key],
+            }
+
+        by_reason: dict[str, int] = {}
+        for item in records:
+            if item.exclusion_reason is not None:
+                by_reason[item.exclusion_reason] = by_reason.get(item.exclusion_reason, 0) + 1
+
+        ranked = sum(1 for item in records if item.rank is not None)
+        source_snapshot = _source_snapshot(store, data_version)
+
+        return {
+            "schemaVersion": "screening-output-v1",
+            "run": {
+                "runId": f"watch-{as_of.isoformat().replace('-', '')}-{stock_id}",
+                "runAt": now_iso(),
+                "asOfDate": periods.as_of_date,
+                "priceAsOf": periods.price_as_of,
+                "revenueAsOf": periods.revenue_month,
+                "revenueCoverage": round(periods.revenue_coverage, 6),
+                "financialAsOf": periods.financial_label,
+                "financialCoverage": round(periods.financial_coverage, 6),
+                "configVersion": config.version,
+                "dataVersion": data_version,
+                "sourceSnapshot": source_snapshot,
+                "status": "success",
+                "profile": watch_profile.to_dict(),
+                "config": {camel(k): v for k, v in config.to_dict().items()},
+                "counts": {
+                    "universe": len(records),
+                    "baseEligible": base_eligible,
+                    "ranked": ranked,
+                },
+            },
+            "candidates": [{
+                "stockId": record.stock_id,
+                "stockName": record.stock_name,
+                "market": record.market,
+                "industry": record.industry,
+                "percentileScope": record.percentile_scope,
+                "metrics": metrics,
+                "riskFlags": [
+                    flag
+                    for flag, on in (
+                        ("disposition", record.disposition_flag),
+                        ("notice", record.notice_flag),
+                    )
+                    if on
+                ],
+                "quantScore": record.quant_score,
+                "rank": record.rank,
+            }],
+            "evidence": [{
+                "id": item.id,
+                "stockId": item.stock_id,
+                "metric": item.metric,
+                "claim": item.claim,
+                "value": item.value,
+                "unit": item.unit,
+                "dataset": item.dataset,
+                "source": item.source,
+                "sourceUrl": item.source_url,
+                "referenceUrl": item.reference_url,
+                "dataAsOf": item.data_as_of,
+                "windowStart": item.window_start,
+                "windowEnd": item.window_end,
+                "fetchedAt": item.fetched_at,
+                "fetchedAtScope": item.fetched_at_scope,
+                "calculation": item.calculation,
+                "verificationStatus": item.verification_status,
+            } for item in evidence],
+            "excluded": {
+                "total": sum(by_reason.values()),
+                "byStage": {
+                    "base": sum(by_reason.values()),
+                    "constraint": 0,
+                },
+                "byReason": by_reason,
+            },
+        }
 
 
 def load_output(store: DataStore, run_id: str, *, limit: int = 20) -> dict[str, Any]:
