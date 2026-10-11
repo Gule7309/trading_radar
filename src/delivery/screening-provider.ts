@@ -6,4 +6,9 @@ export interface ScreeningProvider {
     profile: UserProfile,
     options?: { limit?: number },
   ): Promise<ScreeningOutputV1>;
+
+  inspectTicker(
+    profile: UserProfile,
+    ticker: string,
+  ): Promise<ScreeningOutputV1>;
 }
