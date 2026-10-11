@@ -1,0 +1,241 @@
+import { randomUUID } from "node:crypto";
+import type { StoredResearchRun } from "../research/store.js";
+import type { ResearchService } from "../research/service.js";
+import type { PersonalizationStore } from "./store.js";
+import {
+  createDefaultUserProfile,
+  defaultSoftPreferences,
+  normalizedWeights,
+  type FeedbackInput,
+  type FeedbackReason,
+  type PreferenceChange,
+  type SoftPreferenceWeights,
+  type UserFeedback,
+  type UserProfile,
+  UserProfileSchema,
+} from "./types.js";
+
+const STEP = 0.05;
+
+function add(
+  weights: SoftPreferenceWeights,
+  key: keyof SoftPreferenceWeights,
+  amount: number,
+): void {
+  weights[key] += amount;
+}
+
+function adjustedWeights(
+  before: SoftPreferenceWeights,
+  reasons: FeedbackReason[],
+): { after: SoftPreferenceWeights; appliedReasons: string[] } {
+  const next = { ...before };
+  const appliedReasons: string[] = [];
+
+  for (const reason of reasons) {
+    if (reason === "GROWTH" || reason === "INSUFFICIENT_GROWTH") {
+      add(next, "growth", STEP);
+      appliedReasons.push(`${reason} -> growth +${STEP}`);
+      continue;
+    }
+
+    if (reason === "FINANCIAL_STABILITY") {
+      add(next, "safety", STEP);
+      add(next, "profitability", STEP / 2);
+      appliedReasons.push(
+        `${reason} -> safety +${STEP}, profitability +${STEP / 2}`,
+      );
+      continue;
+    }
+
+    if (reason === "FINANCIAL_QUALITY") {
+      add(next, "profitability", STEP);
+      add(next, "safety", STEP / 2);
+      appliedReasons.push(
+        `${reason} -> profitability +${STEP}, safety +${STEP / 2}`,
+      );
+      continue;
+    }
+
+    if (reason === "HIGH_VOLATILITY") {
+      add(next, "safety", STEP);
+      appliedReasons.push(`${reason} -> safety +${STEP}`);
+      continue;
+    }
+
+    if (reason === "INDUSTRY_TREND") {
+      add(next, "growth", STEP / 2);
+      appliedReasons.push(`${reason} -> growth +${STEP / 2}`);
+      continue;
+    }
+
+    if (reason === "ACCEPTABLE_RISK") {
+      add(next, "growth", STEP / 2);
+      appliedReasons.push(`${reason} -> growth +${STEP / 2}`);
+    }
+  }
+
+  return {
+    after: normalizedWeights(next),
+    appliedReasons,
+  };
+}
+
+function delta(
+  before: SoftPreferenceWeights,
+  after: SoftPreferenceWeights,
+): SoftPreferenceWeights {
+  return {
+    growth: after.growth - before.growth,
+    profitability: after.profitability - before.profitability,
+    safety: after.safety - before.safety,
+  };
+}
+
+export class PersonalizationService {
+  constructor(
+    private readonly store: PersonalizationStore,
+    private readonly research?: Pick<ResearchService, "get">,
+  ) {}
+
+  async getOrCreateProfile(userId: string): Promise<UserProfile> {
+    const existing = await this.store.getProfile(userId);
+    if (existing) return existing;
+
+    const profile = createDefaultUserProfile(userId);
+    await this.store.saveProfile(profile);
+    return profile;
+  }
+
+  async updateProfile(
+    userId: string,
+    input: Partial<
+      Pick<
+        UserProfile,
+        | "investmentHorizon"
+        | "riskTolerance"
+        | "researchStyle"
+        | "hardConstraints"
+        | "softPreferences"
+      >
+    >,
+  ): Promise<UserProfile> {
+    const current = await this.getOrCreateProfile(userId);
+    const now = new Date().toISOString();
+
+    const next = UserProfileSchema.parse({
+      ...current,
+      ...input,
+      userId,
+      softPreferences: input.softPreferences
+        ? normalizedWeights(input.softPreferences)
+        : current.softPreferences,
+      createdAt: current.createdAt,
+      updatedAt: now,
+    });
+
+    await this.store.saveProfile(next);
+    return next;
+  }
+
+  async resetSoftPreferences(userId: string): Promise<UserProfile> {
+    const current = await this.getOrCreateProfile(userId);
+    return this.updateProfile(userId, {
+      softPreferences: defaultSoftPreferences(current.researchStyle),
+    });
+  }
+
+  async recordFeedback(
+    userId: string,
+    input: FeedbackInput,
+  ): Promise<{
+    feedback: UserFeedback;
+    preferenceChange: PreferenceChange;
+    profile: UserProfile;
+    researchRun: StoredResearchRun | null;
+  }> {
+    const run = this.research
+      ? await this.research.get(input.runId)
+      : null;
+
+    if (this.research && !run) {
+      throw new Error("RESEARCH_RUN_NOT_FOUND");
+    }
+
+    const now = new Date().toISOString();
+    const current = await this.getOrCreateProfile(userId);
+    const feedbackId = randomUUID();
+
+    const feedback: UserFeedback = {
+      feedbackId,
+      userId,
+      runId: input.runId,
+      candidateId: run?.candidate.candidateId ?? input.runId,
+      ticker: run?.ticker ?? "unknown",
+      action: input.action,
+      reasons: input.reasons,
+      note: input.note,
+      createdAt: now,
+    };
+
+    const { after, appliedReasons } = adjustedWeights(
+      current.softPreferences,
+      input.reasons,
+    );
+
+    const profile = UserProfileSchema.parse({
+      ...current,
+      softPreferences: after,
+      updatedAt: now,
+    });
+
+    const preferenceChange: PreferenceChange = {
+      changeId: randomUUID(),
+      userId,
+      feedbackId,
+      before: current.softPreferences,
+      after,
+      delta: delta(current.softPreferences, after),
+      reason:
+        appliedReasons.length > 0
+          ? appliedReasons.join("; ")
+          : "Feedback recorded; current three-factor model has no automatic weight mapping for these reasons.",
+      createdAt: now,
+    };
+
+    await this.store.appendFeedback(feedback);
+    await this.store.appendPreferenceChange(preferenceChange);
+    await this.store.saveProfile(profile);
+
+    return {
+      feedback,
+      preferenceChange,
+      profile,
+      researchRun: run,
+    };
+  }
+
+  async listFeedback(userId: string, limit?: number) {
+    return this.store.listFeedback(userId, limit);
+  }
+
+  async listPreferenceChanges(userId: string, limit?: number) {
+    return this.store.listPreferenceChanges(userId, limit);
+  }
+
+  async listProfiles() {
+    return this.store.listProfiles();
+  }
+
+  async getScreeningProfile(userId: string) {
+    const profile = await this.getOrCreateProfile(userId);
+
+    return {
+      excludedIndustries: profile.hardConstraints.excludedIndustries,
+      maxDebtRatio: profile.hardConstraints.maxDebtRatio,
+      minLiquidity: profile.hardConstraints.minLiquidity,
+      excludeDisposition: profile.hardConstraints.excludeDisposition,
+      weights: profile.softPreferences,
+    };
+  }
+}
