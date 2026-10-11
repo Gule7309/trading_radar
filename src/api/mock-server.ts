@@ -311,18 +311,35 @@ class MockScreeningProvider implements ScreeningProvider {
     profile: UserProfile,
     ticker: string,
   ): Promise<ScreeningOutputV1> {
-    const parsed = personalizedMockScreening(
-      await this.fixture(),
-      profile,
-    );
-    const candidate = parsed.candidates.find(
+    const parsed = await this.fixture();
+    const original = parsed.candidates.find(
       (item) => item.stockId === ticker,
     );
-    if (!candidate) {
+    if (!original) {
       throw new Error(
         `MOCK_TICKER_NOT_IN_FIXTURE:${ticker}`,
       );
     }
+
+    const weights = profile.softPreferences;
+    const total =
+      weights.growth +
+      weights.profitability +
+      weights.safety;
+    const candidate = {
+      ...original,
+      quantScore:
+        total > 0
+          ? ((original.metrics.revenueYoY.percentile ?? 0) *
+                weights.growth +
+              (original.metrics.operatingMargin.percentile ?? 0) *
+                weights.profitability +
+              (original.metrics.debtRatio.percentile ?? 0) *
+                weights.safety) /
+            total
+          : original.quantScore,
+      rank: 1,
+    };
 
     const evidenceIds = new Set(
       Object.values(candidate.metrics).map(
@@ -334,7 +351,27 @@ class MockScreeningProvider implements ScreeningProvider {
       ...parsed,
       run: {
         ...parsed.run,
-        runId: `mock-watch-${ticker}`,
+        // Keep the screening-output-v1 run-id format while separating
+        // the saved-stock fixture from the discovery run.
+        runId: `20261010-${String(
+          Math.abs(
+            ticker
+              .split("")
+              .reduce(
+                (sum, char) => sum + char.charCodeAt(0),
+                0,
+              ),
+          ) + 900,
+        )}`,
+        profile: {
+          ...parsed.run.profile,
+          weights: profile.softPreferences,
+          watchlistRecheck: true,
+        },
+        counts: {
+          ...parsed.run.counts,
+          ranked: 1,
+        },
       },
       candidates: [candidate],
       evidence: parsed.evidence.filter((item) =>
