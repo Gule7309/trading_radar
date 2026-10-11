@@ -1,5 +1,8 @@
 import type { LlmProvider } from "../infra/llm/provider.js";
-import { MeteredLlmProvider } from "../infra/llm/metered-provider.js";
+import {
+  MeteredLlmProvider,
+  llmPricingFromEnv,
+} from "../infra/llm/metered-provider.js";
 import type { SearchProvider } from "../infra/search/provider.js";
 import { LlmResearchController } from "../agent/llm-controller.js";
 import { DefaultToolRouter } from "../tools/default-tool-router.js";
@@ -25,7 +28,10 @@ export function createResearchRuntime(
   llm: LlmProvider,
   search: SearchProvider,
 ): ResearchRuntime {
-  const telemetry = new MeteredLlmProvider(llm);
+  const telemetry = new MeteredLlmProvider(
+    llm,
+    llmPricingFromEnv(),
+  );
 
   return {
     controller: new LlmResearchController(telemetry),
