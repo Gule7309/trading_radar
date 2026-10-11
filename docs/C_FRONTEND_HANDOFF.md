@@ -645,6 +645,15 @@ Real server：
 npm run api
 ```
 
+Backend 會用兩個 Data CLI path：
+
+```text
+taiwan-data screen   → 每日 discovery / Top-K
+taiwan-data inspect  → 已收藏單股的 fresh Candidate + Evidence snapshot
+```
+
+`inspect` 會忽略 discovery hard constraints，因為已收藏股票即使不再符合新的篩選條件，也仍應被持續監控；它仍要求基礎資料可驗證。
+
 Scheduler：
 
 - timezone = Asia/Taipei
