@@ -64,10 +64,15 @@ describe("thesis tracker", () => {
       "thesis-1",
     );
 
-    const next = recheckThesis(
-      initial,
-      result("REFUTED", "2026-11-07T00:00:00Z"),
-    );
+    const refuted = {
+      ...result("REFUTED", "2026-11-07T00:00:00Z"),
+      status: "REJECTED" as const,
+      decision: "REJECT" as const,
+      thesis: undefined,
+      stopReason: "INSUFFICIENT_EVIDENCE" as const,
+    };
+
+    const next = recheckThesis(initial, refuted);
 
     expect(next.version).toBe(2);
     expect(next.status).toBe("INVALIDATED");
@@ -79,10 +84,15 @@ describe("thesis tracker", () => {
       "thesis-1",
     );
 
-    const next = recheckThesis(
-      initial,
-      result("CONFLICTING", "2026-11-07T00:00:00Z"),
-    );
+    const conflicting = {
+      ...result("CONFLICTING", "2026-11-07T00:00:00Z"),
+      status: "REJECTED" as const,
+      decision: "REJECT" as const,
+      thesis: undefined,
+      stopReason: "UNRESOLVED_CONFLICT" as const,
+    };
+
+    const next = recheckThesis(initial, conflicting);
 
     expect(next.status).toBe("WEAKENED");
   });
