@@ -25,48 +25,50 @@ export class CliScreeningProvider implements ScreeningProvider {
 
   constructor(options: CliScreeningProviderOptions) {
     if (!options.dbPath) {
-      throw new Error("TAIWAN_DATA_DB is required for scheduled screening.");
+      throw new Error(
+        "TAIWAN_DATA_DB is required for scheduled screening.",
+      );
     }
     this.dbPath = options.dbPath;
     this.command = options.command ?? "taiwan-data";
     this.timeoutMs = options.timeoutMs ?? 120_000;
   }
 
-  async screen(
+  private profilePayload(profile: UserProfile) {
+    return {
+      excludedIndustries:
+        profile.hardConstraints.excludedIndustries,
+      maxDebtRatio: profile.hardConstraints.maxDebtRatio,
+      minLiquidity: profile.hardConstraints.minLiquidity,
+      excludeDisposition:
+        profile.hardConstraints.excludeDisposition,
+      weights: profile.softPreferences,
+    };
+  }
+
+  private async runCommand(
     profile: UserProfile,
-    options: { limit?: number } = {},
+    args: string[],
   ): Promise<ScreeningOutputV1> {
-    const dir = await mkdtemp(join(tmpdir(), "trading-radar-screen-"));
+    const dir = await mkdtemp(
+      join(tmpdir(), "trading-radar-screen-"),
+    );
     const profilePath = join(dir, "profile.json");
-    const outputPath = join(dir, "screening-output.json");
+    const outputPath = join(dir, "output.json");
 
     try {
       await writeFile(
         profilePath,
-        JSON.stringify(
-          {
-            excludedIndustries:
-              profile.hardConstraints.excludedIndustries,
-            maxDebtRatio: profile.hardConstraints.maxDebtRatio,
-            minLiquidity: profile.hardConstraints.minLiquidity,
-            excludeDisposition:
-              profile.hardConstraints.excludeDisposition,
-            weights: profile.softPreferences,
-          },
-          null,
-          2,
-        ),
+        JSON.stringify(this.profilePayload(profile), null, 2),
         "utf8",
       );
 
       await execFileAsync(
         this.command,
         [
-          "screen",
+          ...args,
           "--db",
           this.dbPath,
-          "--limit",
-          String(Math.max(1, Math.min(options.limit ?? 20, 50))),
           "--profile",
           profilePath,
           "--output",
@@ -88,13 +90,37 @@ export class CliScreeningProvider implements ScreeningProvider {
     }
   }
 
+  async screen(
+    profile: UserProfile,
+    options: { limit?: number } = {},
+  ): Promise<ScreeningOutputV1> {
+    return this.runCommand(profile, [
+      "screen",
+      "--limit",
+      String(Math.max(1, Math.min(options.limit ?? 20, 50))),
+    ]);
+  }
+
+  async inspectTicker(
+    profile: UserProfile,
+    ticker: string,
+  ): Promise<ScreeningOutputV1> {
+    return this.runCommand(profile, [
+      "inspect",
+      "--stock-id",
+      ticker,
+    ]);
+  }
+
   static fromEnv(
     env: NodeJS.ProcessEnv = process.env,
   ): CliScreeningProvider {
     return new CliScreeningProvider({
       dbPath: env.TAIWAN_DATA_DB ?? "",
       command: env.TAIWAN_DATA_CLI ?? "taiwan-data",
-      timeoutMs: Number(env.TAIWAN_DATA_SCREEN_TIMEOUT_MS ?? "120000"),
+      timeoutMs: Number(
+        env.TAIWAN_DATA_SCREEN_TIMEOUT_MS ?? "120000",
+      ),
     });
   }
 }
