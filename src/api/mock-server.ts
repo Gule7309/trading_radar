@@ -422,6 +422,40 @@ const delivery = new DailyDeliveryService(
   watchlist,
 );
 
+const mockAdmin = {
+  async status() {
+    return {
+      llmProvider: "mock",
+      llmModel: "mock",
+      searchProvider: "mock",
+      searchModel: "mock",
+      modelCredentialConfigured: false,
+      taiwanDataConfigured: false,
+      dailySchedulerEnabled: false,
+      dailyResearchAfterHour: 17,
+      registeredUsers:
+        (await personalization.listProfiles()).length,
+      latestDeliveryRuns: [],
+    };
+  },
+  async modelCheck() {
+    return {
+      ok: true,
+      provider: "mock",
+      model: "mock",
+      latencyMs: 0,
+    };
+  },
+  async dataStatus() {
+    return {
+      configured: false,
+      mock: true,
+      tables: {},
+      datasetStatus: [],
+    };
+  },
+};
+
 const port = Number(process.env.PORT ?? "8787");
 
 const server = createResearchApi(research, {
@@ -433,6 +467,7 @@ const server = createResearchApi(research, {
   watchlist,
   notifications,
   delivery,
+  admin: mockAdmin,
 });
 
 server.listen(port, "127.0.0.1", () => {
