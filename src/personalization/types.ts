@@ -28,6 +28,14 @@ export const UserProfileSchema = z.object({
   updatedAt: z.string().min(1),
 });
 
+export const UserProfileUpdateSchema = z.object({
+  investmentHorizon: z.enum(["SHORT", "MEDIUM", "LONG"]).optional(),
+  riskTolerance: z.enum(["LOW", "MEDIUM", "HIGH"]).optional(),
+  researchStyle: z.enum(["GROWTH", "BALANCED", "STABLE"]).optional(),
+  hardConstraints: HardConstraintsSchema.optional(),
+  softPreferences: SoftPreferenceWeightsSchema.optional(),
+});
+
 export const FeedbackActionSchema = z.enum(["SAVE", "SKIP"]);
 
 export const FeedbackReasonSchema = z.enum([
@@ -55,6 +63,7 @@ export type SoftPreferenceWeights = z.infer<
 >;
 export type HardConstraints = z.infer<typeof HardConstraintsSchema>;
 export type UserProfile = z.infer<typeof UserProfileSchema>;
+export type UserProfileUpdate = z.infer<typeof UserProfileUpdateSchema>;
 export type FeedbackAction = z.infer<typeof FeedbackActionSchema>;
 export type FeedbackReason = z.infer<typeof FeedbackReasonSchema>;
 export type FeedbackInput = z.infer<typeof FeedbackInputSchema>;
