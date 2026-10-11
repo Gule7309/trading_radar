@@ -17,7 +17,10 @@ A candidate stocks
 → verification / conflicts / risks
 → deterministic publication gate
 → Top-K results
-→ versioned investment thesis tracking
+→ SAVE / SKIP feedback
+→ preference-aware next ranking
+→ watchlist + versioned investment thesis
+→ proactive notifications
 ```
 
 It does **not** predict guaranteed returns or auto-trade.
@@ -81,6 +84,12 @@ Default: `http://127.0.0.1:8787`.
 
 Main B endpoints:
 
+- `GET|PUT /api/users/:userId/profile`
+- `POST /api/users/:userId/feedback`
+- `GET /api/users/:userId/preference-history`
+- `GET /api/users/:userId/watchlist`
+- `GET /api/users/:userId/notifications`
+- `POST /api/users/:userId/daily-research`
 - `POST /api/research/screening-output`
 - `POST /api/research/runs`
 - `POST /api/research/batch`
