@@ -29,3 +29,4 @@ export type {
 } from "../notifications/types.js";
 export type { DailyDeliveryRun } from "../delivery/types.js";
 export type { ThesisEvent, ThesisVersion } from "../thesis/types.js";
+export type { AdminRuntimeStatus } from "../admin/service.js";
