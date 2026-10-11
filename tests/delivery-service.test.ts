@@ -128,4 +128,75 @@ describe("DailyDeliveryService", () => {
     expect(second.reused).toBe(true);
     expect(screening.calls).toBe(1);
   });
+
+  it("automatically rechecks saved theses from fresh single-stock evidence", async () => {
+    const screening = new FixtureScreening();
+    let runSequence = 0;
+    const batch = new BatchResearchService({
+      async run(candidate: CandidatePacket) {
+        runSequence += 1;
+        return researchResult(candidate, `run-${runSequence}`);
+      },
+    });
+
+    const personalization = new PersonalizationService(
+      new InMemoryPersonalizationStore(),
+    );
+    await personalization.getOrCreateProfile("u1");
+
+    const rechecked: string[] = [];
+    const watchlist = {
+      async list() {
+        return [
+          {
+            userId: "u1",
+            ticker: "2059",
+            companyName: "川湖",
+            thesisId: "thesis-1",
+            sourceResearchRunId: "old-run",
+            candidate: {} as CandidatePacket,
+            createdAt: "2026-10-01T00:00:00Z",
+            updatedAt: "2026-10-01T00:00:00Z",
+          },
+        ];
+      },
+      async recheck(
+        _userId: string,
+        ticker: string,
+        candidate: CandidatePacket,
+      ) {
+        rechecked.push(ticker);
+        expect(candidate.ticker).toBe(ticker);
+        return {
+          researchRunId: "recheck-run",
+          thesis: { status: "WEAKENED" },
+        };
+      },
+    };
+
+    const delivery = new DailyDeliveryService(
+      screening,
+      personalization,
+      batch,
+      new NotificationService(
+        new InMemoryNotificationStore(),
+      ),
+      new InMemoryDeliveryRunStore(),
+      watchlist as any,
+    );
+
+    const output = await delivery.runForUser("u1", {
+      force: true,
+      targetDate: "2026-10-08",
+      screeningLimit: 2,
+      researchLimit: 1,
+      topK: 1,
+      watchlistRecheckLimit: 5,
+    });
+
+    expect(rechecked).toEqual(["2059"]);
+    expect(
+      (output as any).watchlistRechecks.rechecked,
+    ).toBe(1);
+  });
 });
