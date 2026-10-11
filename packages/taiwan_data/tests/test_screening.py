@@ -18,7 +18,15 @@ import pytest
 
 from taiwan_data import cli
 from taiwan_data.db import DataStore
-from taiwan_data.screening import Profile, ScreeningConfig, ScreeningError, get_candidates, load_output, run_screening
+from taiwan_data.screening import (
+    Profile,
+    ScreeningConfig,
+    ScreeningError,
+    get_candidate_snapshot,
+    get_candidates,
+    load_output,
+    run_screening,
+)
 from taiwan_data.screening.metrics import add_months
 
 SCHEMA = json.loads(
@@ -591,3 +599,58 @@ def test_downloaded_database_gets_a_source_snapshot(store, tmp_path):
     download_snapshot(dest, kind="full", source=str(tmp_path / "dist"))
     out = get_candidates(DataStore(dest), config=CFG, as_of_date="2026-10-10")
     assert out["run"]["sourceSnapshot"] == f"sha256:{manifest['database_sha256']}"
+
+
+
+def test_single_stock_snapshot_supports_saved_thesis_monitoring(store, tmp_path):
+    profile = Profile(
+        excluded_industries=["甲業"],
+        max_debt_ratio=1,
+        min_liquidity=9e12,
+        exclude_disposition=True,
+        weights={"growth": 1, "profitability": 0, "safety": 0},
+    )
+
+    out = get_candidate_snapshot(
+        store,
+        "A6",
+        profile,
+        as_of_date="2026-10-10",
+        config=CFG,
+    )
+
+    jsonschema.validate(out, SCHEMA)
+    assert len(out["candidates"]) == 1
+    candidate = out["candidates"][0]
+    assert candidate["stockId"] == "A6"
+    # Watchlist monitoring ignores user discovery hard constraints.
+    assert candidate["industry"] == "甲業"
+    assert candidate["quantScore"] == pytest.approx(1.0)
+    assert len(out["evidence"]) == 4
+    assert all(e["stockId"] == "A6" for e in out["evidence"])
+    assert all(e["verificationStatus"] == "verified" for e in out["evidence"])
+
+    output = tmp_path / "inspect.json"
+    profile_path = tmp_path / "profile.json"
+    profile_path.write_text(
+        json.dumps(profile.to_dict(), ensure_ascii=False),
+        encoding="utf-8",
+    )
+
+    cli.main([
+        "inspect",
+        "--db",
+        str(store.path),
+        "--stock-id",
+        "A6",
+        "--as-of",
+        "2026-10-10",
+        "--profile",
+        str(profile_path),
+        "--output",
+        str(output),
+    ])
+
+    cli_out = json.loads(output.read_text(encoding="utf-8"))
+    jsonschema.validate(cli_out, SCHEMA)
+    assert cli_out["candidates"][0]["stockId"] == "A6"
