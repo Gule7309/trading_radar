@@ -29,6 +29,19 @@ function mockResult(candidate: CandidatePacket): ResearchResult {
   const now = new Date().toISOString();
   const officialSourceId = `mock-official-${candidate.ticker}`;
   const riskSourceId = `mock-risk-${candidate.ticker}`;
+  const scenario = candidate.dataSources
+    ?.map((item) => item.source)
+    .find((source) => source.startsWith("mock-scenario:"))
+    ?.split(":")[1];
+  const claimStatus =
+    scenario === "invalidated"
+      ? "REFUTED"
+      : scenario === "weakened"
+        ? "INSUFFICIENT"
+        : scenario === "conflict"
+          ? "CONFLICTING"
+          : "SUPPORTED";
+  const rejected = claimStatus !== "SUPPORTED";
   const coreSignal =
     candidate.quantSignals.find(
       (signal) => signal.metric === "revenue_yoy",
@@ -38,10 +51,11 @@ function mockResult(candidate: CandidatePacket): ResearchResult {
     runId: `mock-${candidate.candidateId}-${Date.now()}`,
     ticker: candidate.ticker,
     companyName: candidate.companyName,
-    status: "PUBLISHABLE",
-    decision: "KEEP",
-    thesis:
-      `[MOCK] ${candidate.companyName} has a supported quantitative signal and a monitorable downside risk. Replace this with a live B run before demo sign-off.`,
+    status: rejected ? "REJECTED" : "PUBLISHABLE",
+    decision: rejected ? "REJECT" : "KEEP",
+    thesis: rejected
+      ? undefined
+      : `[MOCK] ${candidate.companyName} has a supported quantitative signal and a monitorable downside risk. Replace this with a live B run before demo sign-off.`,
     keyReasons: [
       coreSignal
         ? `[MOCK] ${coreSignal.metric} = ${String(coreSignal.value)} for ${coreSignal.period}.`
@@ -53,7 +67,7 @@ function mockResult(candidate: CandidatePacket): ResearchResult {
         text: coreSignal
           ? `[MOCK] ${coreSignal.metric} is supported by upstream quantitative evidence.`
           : "[MOCK] Upstream quantitative evidence is available.",
-        status: "SUPPORTED",
+        status: claimStatus,
         category: "FINANCIAL",
         importance: "CORE",
         sourceIds: [officialSourceId],
@@ -97,7 +111,7 @@ function mockResult(candidate: CandidatePacket): ResearchResult {
     verificationSummary: {
       coreClaimCoverage: 1,
       primarySourceRatio: 0.5,
-      unresolvedConflicts: 0,
+      unresolvedConflicts: claimStatus === "CONFLICTING" ? 1 : 0,
       freshness: "CURRENT",
     },
     researchTrace: [
@@ -137,7 +151,12 @@ function mockResult(candidate: CandidatePacket): ResearchResult {
       llmLatencyMs: 0,
       totalLatencyMs: 25,
     },
-    stopReason: "PUBLISHED",
+    stopReason:
+      claimStatus === "CONFLICTING"
+        ? "UNRESOLVED_CONFLICT"
+        : rejected
+          ? "INSUFFICIENT_EVIDENCE"
+          : "PUBLISHED",
     startedAt: now,
     completedAt: now,
   };
