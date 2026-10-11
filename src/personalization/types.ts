@@ -115,7 +115,8 @@ export interface UserFeedback {
 export interface PreferenceChange {
   changeId: string;
   userId: string;
-  feedbackId: string;
+  source: "FEEDBACK" | "MANUAL" | "RESET";
+  feedbackId?: string;
   before: SoftPreferenceWeights;
   after: SoftPreferenceWeights;
   delta: SoftPreferenceWeights;
