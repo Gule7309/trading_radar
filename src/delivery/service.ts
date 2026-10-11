@@ -35,7 +35,7 @@ export class DailyDeliveryService {
     profile: Awaited<
       ReturnType<PersonalizationService["getOrCreateProfile"]>
     >,
-    localDate: string,
+    targetDate: string,
     limit = 5,
   ) {
     if (!this.watchlist) {
@@ -59,9 +59,10 @@ export class DailyDeliveryService {
         const freshOutput = await this.screening.inspectTicker(
           profile,
           item.ticker,
+          { asOfDate: targetDate },
         );
 
-        if (freshOutput.run.priceAsOf !== localDate) {
+        if (freshOutput.run.priceAsOf !== targetDate) {
           results.push({
             ticker: item.ticker,
             status: "WAITING_FOR_FRESH_DATA",
@@ -117,9 +118,10 @@ export class DailyDeliveryService {
       researchLimit?: number;
       concurrency?: number;
       watchlistRecheckLimit?: number;
+      targetDate?: string;
     } = {},
   ) {
-    const localDate = taipeiLocalDate();
+    const localDate = options.targetDate ?? taipeiLocalDate();
 
     if (!options.force) {
       const existing = await this.store.getSuccessful(
@@ -151,6 +153,7 @@ export class DailyDeliveryService {
         );
       const output = await this.screening.screen(profile, {
         limit: options.screeningLimit ?? 20,
+        asOfDate: localDate,
       });
 
       if (
@@ -189,7 +192,7 @@ export class DailyDeliveryService {
         await this.recheckWatchlist(
           userId,
           profile,
-          output.run.priceAsOf,
+          localDate,
           options.watchlistRecheckLimit ?? 5,
         );
 
