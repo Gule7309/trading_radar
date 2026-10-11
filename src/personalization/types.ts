@@ -32,8 +32,8 @@ export const UserProfileUpdateSchema = z.object({
   investmentHorizon: z.enum(["SHORT", "MEDIUM", "LONG"]).optional(),
   riskTolerance: z.enum(["LOW", "MEDIUM", "HIGH"]).optional(),
   researchStyle: z.enum(["GROWTH", "BALANCED", "STABLE"]).optional(),
-  hardConstraints: HardConstraintsSchema.optional(),
-  softPreferences: SoftPreferenceWeightsSchema.optional(),
+  hardConstraints: HardConstraintsSchema.partial().optional(),
+  softPreferences: SoftPreferenceWeightsSchema.partial().optional(),
 });
 
 export const FeedbackActionSchema = z.enum(["SAVE", "SKIP"]);
