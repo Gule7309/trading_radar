@@ -289,7 +289,7 @@ function personalizedMockScreening(
 }
 
 class MockScreeningProvider implements ScreeningProvider {
-  async screen(profile: UserProfile): Promise<ScreeningOutputV1> {
+  private async fixture(): Promise<ScreeningOutputV1> {
     const fixtureUrl = new URL(
       "../../packages/taiwan_data/tests/fixtures/sample_screening_output.json",
       import.meta.url,
@@ -297,8 +297,50 @@ class MockScreeningProvider implements ScreeningProvider {
     const raw = JSON.parse(
       await readFile(fixtureUrl, "utf8"),
     ) as unknown;
-    const parsed = ScreeningOutputV1Schema.parse(raw);
-    return personalizedMockScreening(parsed, profile);
+    return ScreeningOutputV1Schema.parse(raw);
+  }
+
+  async screen(profile: UserProfile): Promise<ScreeningOutputV1> {
+    return personalizedMockScreening(
+      await this.fixture(),
+      profile,
+    );
+  }
+
+  async inspectTicker(
+    profile: UserProfile,
+    ticker: string,
+  ): Promise<ScreeningOutputV1> {
+    const parsed = personalizedMockScreening(
+      await this.fixture(),
+      profile,
+    );
+    const candidate = parsed.candidates.find(
+      (item) => item.stockId === ticker,
+    );
+    if (!candidate) {
+      throw new Error(
+        `MOCK_TICKER_NOT_IN_FIXTURE:${ticker}`,
+      );
+    }
+
+    const evidenceIds = new Set(
+      Object.values(candidate.metrics).map(
+        (metric) => metric.evidenceId,
+      ),
+    );
+
+    return ScreeningOutputV1Schema.parse({
+      ...parsed,
+      run: {
+        ...parsed.run,
+        runId: `mock-watch-${ticker}`,
+      },
+      candidates: [candidate],
+      evidence: parsed.evidence.filter((item) =>
+        evidenceIds.has(item.id),
+      ),
+    });
   }
 }
 
@@ -340,6 +382,7 @@ const delivery = new DailyDeliveryService(
   batch,
   notifications,
   new InMemoryDeliveryRunStore(),
+  watchlist,
 );
 
 const port = Number(process.env.PORT ?? "8787");
