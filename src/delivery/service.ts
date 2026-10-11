@@ -3,6 +3,7 @@ import { screeningOutputToCandidatePackets } from "../domain/screening-output.js
 import type { BatchResearchService } from "../research/batch-service.js";
 import type { PersonalizationService } from "../personalization/service.js";
 import type { NotificationService } from "../notifications/service.js";
+import type { WatchlistService } from "../watchlist/service.js";
 import type { DeliveryRunStore } from "./store.js";
 import type { ScreeningProvider } from "./screening-provider.js";
 import type { DailyDeliveryRun } from "./types.js";
@@ -23,7 +24,89 @@ export class DailyDeliveryService {
     private readonly batch: BatchResearchService,
     private readonly notifications: NotificationService,
     private readonly store: DeliveryRunStore,
+    private readonly watchlist?: Pick<
+      WatchlistService,
+      "list" | "recheck"
+    >,
   ) {}
+
+  private async recheckWatchlist(
+    userId: string,
+    profile: Awaited<
+      ReturnType<PersonalizationService["getOrCreateProfile"]>
+    >,
+    localDate: string,
+    limit = 5,
+  ) {
+    if (!this.watchlist) {
+      return {
+        rechecked: 0,
+        failed: 0,
+        items: [] as Array<Record<string, unknown>>,
+      };
+    }
+
+    const items = (await this.watchlist.list(userId)).slice(
+      0,
+      Math.max(0, limit),
+    );
+    const results: Array<Record<string, unknown>> = [];
+    let rechecked = 0;
+    let failed = 0;
+
+    for (const item of items) {
+      try {
+        const freshOutput = await this.screening.inspectTicker(
+          profile,
+          item.ticker,
+        );
+
+        if (freshOutput.run.priceAsOf !== localDate) {
+          results.push({
+            ticker: item.ticker,
+            status: "WAITING_FOR_FRESH_DATA",
+            priceAsOf: freshOutput.run.priceAsOf,
+          });
+          continue;
+        }
+
+        const [candidate] =
+          screeningOutputToCandidatePackets(freshOutput);
+        if (!candidate) {
+          throw new Error(
+            `No candidate snapshot returned for ${item.ticker}.`,
+          );
+        }
+
+        const result = await this.watchlist.recheck(
+          userId,
+          item.ticker,
+          candidate,
+          "MONTHLY_REVENUE",
+        );
+        rechecked += 1;
+        results.push({
+          ticker: item.ticker,
+          status: "RECHECKED",
+          thesisStatus:
+            (result as { thesis?: { status?: string } }).thesis
+              ?.status,
+        });
+      } catch (error) {
+        failed += 1;
+        results.push({
+          ticker: item.ticker,
+          status: "FAILED",
+          error:
+            error instanceof Error
+              ? error.message
+              : "Unknown watchlist recheck error",
+        });
+      }
+    }
+
+    return { rechecked, failed, items: results };
+  }
 
   async runForUser(
     userId: string,
@@ -33,12 +116,16 @@ export class DailyDeliveryService {
       topK?: number;
       researchLimit?: number;
       concurrency?: number;
+      watchlistRecheckLimit?: number;
     } = {},
   ) {
     const localDate = taipeiLocalDate();
 
     if (!options.force) {
-      const existing = await this.store.getSuccessful(userId, localDate);
+      const existing = await this.store.getSuccessful(
+        userId,
+        localDate,
+      );
       if (existing) {
         return {
           reused: true,
@@ -59,11 +146,17 @@ export class DailyDeliveryService {
 
     try {
       const profile =
-        await this.personalization.getOrCreateProfile(userId);
+        await this.personalization.getOrCreateProfile(
+          userId,
+        );
       const output = await this.screening.screen(profile, {
         limit: options.screeningLimit ?? 20,
       });
-      if (!options.force && output.run.priceAsOf !== localDate) {
+
+      if (
+        !options.force &&
+        output.run.priceAsOf !== localDate
+      ) {
         const waiting: DailyDeliveryRun = {
           ...deliveryRun,
           status: "WAITING_FOR_FRESH_DATA",
@@ -92,6 +185,14 @@ export class DailyDeliveryService {
         concurrency: options.concurrency ?? 2,
       });
 
+      const watchlistRechecks =
+        await this.recheckWatchlist(
+          userId,
+          profile,
+          output.run.priceAsOf,
+          options.watchlistRecheckLimit ?? 5,
+        );
+
       const completed: DailyDeliveryRun = {
         ...deliveryRun,
         status: "SUCCESS",
@@ -99,6 +200,8 @@ export class DailyDeliveryService {
         priceAsOf: output.run.priceAsOf,
         researchCount: result.researched,
         publishedCount: result.top.length,
+        watchlistRechecked: watchlistRechecks.rechecked,
+        watchlistRecheckFailed: watchlistRechecks.failed,
         completedAt: new Date().toISOString(),
       };
       await this.store.save(completed);
@@ -116,6 +219,7 @@ export class DailyDeliveryService {
         deliveryRun: completed,
         screeningOutput: output,
         result,
+        watchlistRechecks,
         notification,
       };
     } catch (error) {
@@ -124,7 +228,9 @@ export class DailyDeliveryService {
         status: "FAILED",
         completedAt: new Date().toISOString(),
         error:
-          error instanceof Error ? error.message : "Unknown delivery error",
+          error instanceof Error
+            ? error.message
+            : "Unknown delivery error",
       };
       await this.store.save(failed);
       throw error;
