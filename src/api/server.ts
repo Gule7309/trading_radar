@@ -82,6 +82,7 @@ if (process.env.TAIWAN_DATA_DB) {
     batch,
     notifications,
     deliveryStore,
+    watchlist,
   );
 
   if (
