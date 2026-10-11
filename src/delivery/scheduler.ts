@@ -1,11 +1,13 @@
 import type { PersonalizationService } from "../personalization/service.js";
 import type { DailyDeliveryService } from "./service.js";
 
-function taipeiParts(now = new Date()): {
+interface TaipeiParts {
   localDate: string;
   hour: number;
   weekday: number;
-} {
+}
+
+function taipeiParts(now = new Date()): TaipeiParts {
   const parts = new Intl.DateTimeFormat("en-US", {
     timeZone: "Asia/Taipei",
     year: "numeric",
@@ -30,10 +32,54 @@ function taipeiParts(now = new Date()): {
   };
 
   return {
-    localDate: `${value("year")}-${value("month")}-${value("day")}`,
+    localDate:
+      `${value("year")}-${value("month")}-${value("day")}`,
     hour: Number(value("hour")),
     weekday: weekdayMap[value("weekday")] ?? 0,
   };
+}
+
+function subtractDays(
+  isoDate: string,
+  days: number,
+): string {
+  const [year, month, day] = isoDate
+    .split("-")
+    .map((value) => Number(value));
+  const date = new Date(
+    Date.UTC(year ?? 1970, (month ?? 1) - 1, day ?? 1),
+  );
+  date.setUTCDate(date.getUTCDate() - days);
+  return date.toISOString().slice(0, 10);
+}
+
+export function latestExpectedDeliveryDate(
+  now = new Date(),
+  afterHour = 17,
+): string {
+  const { localDate, hour, weekday } = taipeiParts(now);
+
+  if (
+    weekday >= 1 &&
+    weekday <= 5 &&
+    hour >= afterHour
+  ) {
+    return localDate;
+  }
+
+  if (weekday === 0) {
+    return subtractDays(localDate, 2);
+  }
+
+  if (weekday === 6) {
+    return subtractDays(localDate, 1);
+  }
+
+  if (weekday === 1) {
+    return subtractDays(localDate, 3);
+  }
+
+  return subtractDays(localDate, 1);
 }
 
 export class DailyResearchScheduler {
@@ -58,7 +104,10 @@ export class DailyResearchScheduler {
     );
 
     void this.tick();
-    this.timer = setInterval(() => void this.tick(), intervalMs);
+    this.timer = setInterval(
+      () => void this.tick(),
+      intervalMs,
+    );
   }
 
   stop(): void {
@@ -70,24 +119,29 @@ export class DailyResearchScheduler {
   async tick(now = new Date()): Promise<void> {
     if (this.running) return;
 
-    const { hour, weekday } = taipeiParts(now);
     const afterHour = this.options.afterHour ?? 17;
-
-    if (weekday === 0 || weekday === 6 || hour < afterHour) {
-      return;
-    }
+    const targetDate = latestExpectedDeliveryDate(
+      now,
+      afterHour,
+    );
 
     this.running = true;
     try {
-      const profiles = await this.personalization.listProfiles();
+      const profiles =
+        await this.personalization.listProfiles();
+
       for (const profile of profiles) {
         try {
-          await this.delivery.runForUser(profile.userId);
+          await this.delivery.runForUser(
+            profile.userId,
+            { targetDate },
+          );
         } catch (error) {
           console.error(
             JSON.stringify({
               service: "daily-research-scheduler",
               userId: profile.userId,
+              targetDate,
               error:
                 error instanceof Error
                   ? error.message
