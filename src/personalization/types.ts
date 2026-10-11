@@ -51,12 +51,44 @@ export const FeedbackReasonSchema = z.enum([
   "OTHER",
 ]);
 
-export const FeedbackInputSchema = z.object({
-  runId: z.string().min(1),
-  action: FeedbackActionSchema,
-  reasons: z.array(FeedbackReasonSchema).min(1).max(4),
-  note: z.string().max(500).optional(),
-});
+const SAVE_REASONS = new Set([
+  "GROWTH",
+  "FINANCIAL_STABILITY",
+  "INDUSTRY_TREND",
+  "ACCEPTABLE_RISK",
+  "OTHER",
+]);
+
+const SKIP_REASONS = new Set([
+  "HIGH_VOLATILITY",
+  "FINANCIAL_QUALITY",
+  "UNFAMILIAR_INDUSTRY",
+  "INSUFFICIENT_GROWTH",
+  "VALUATION_CONCERN",
+  "OTHER",
+]);
+
+export const FeedbackInputSchema = z
+  .object({
+    runId: z.string().min(1),
+    action: FeedbackActionSchema,
+    reasons: z.array(FeedbackReasonSchema).min(1).max(4),
+    note: z.string().max(500).optional(),
+  })
+  .superRefine((value, ctx) => {
+    const allowed =
+      value.action === "SAVE" ? SAVE_REASONS : SKIP_REASONS;
+
+    value.reasons.forEach((reason, index) => {
+      if (!allowed.has(reason)) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["reasons", index],
+          message: `${reason} is not valid for ${value.action} feedback.`,
+        });
+      }
+    });
+  });
 
 export type SoftPreferenceWeights = z.infer<
   typeof SoftPreferenceWeightsSchema
