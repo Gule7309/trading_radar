@@ -10,8 +10,15 @@ export interface ThesisResearchResult {
 
 export class ThesisResearchService {
   constructor(
-    private readonly research: ResearchService,
-    private readonly theses: ThesisService,
+    private readonly research: Pick<ResearchService, "run">,
+    private readonly theses: Pick<
+      ThesisService,
+      | "createFromResearch"
+      | "getLatest"
+      | "listVersions"
+      | "listEvents"
+      | "recheckFromResearch"
+    >,
   ) {}
 
   async create(
