@@ -237,6 +237,16 @@ GET /api/theses/:thesisId/versions
 GET /api/theses/:thesisId/events
 ```
 
+## Admin / runtime health
+
+```http
+GET  /api/admin/status
+POST /api/admin/model-check
+GET  /api/admin/data-status
+```
+
+These endpoints expose safe configuration/status only. They never return model credentials or API keys.
+
 ## C contract
 
 Shared TypeScript types:
