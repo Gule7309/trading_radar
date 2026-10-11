@@ -119,10 +119,16 @@ export class PersonalizationService {
       ...current.hardConstraints,
       ...(input.hardConstraints ?? {}),
     };
-    const mergedSoftPreferences = {
-      ...current.softPreferences,
-      ...(input.softPreferences ?? {}),
-    };
+    const mergedSoftPreferences =
+      input.softPreferences
+        ? {
+            ...current.softPreferences,
+            ...input.softPreferences,
+          }
+        : input.researchStyle &&
+            input.researchStyle !== current.researchStyle
+          ? defaultSoftPreferences(input.researchStyle)
+          : current.softPreferences;
 
     const next = UserProfileSchema.parse({
       ...current,
