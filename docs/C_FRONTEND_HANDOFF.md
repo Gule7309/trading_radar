@@ -2,47 +2,38 @@
 
 > **給 C：先看這份。**
 >
-> B / Agent + Evidence 的 MVP HTTP contract 已可供前端開發。你不需要等 OpenAI，也不需要持有 Gemini/OpenAI API key。
+> B 的 HTTP contract 已可直接接。現在不需要等 OpenAI，也不需要把 Gemini/OpenAI key 放到前端。
+>
+> 這一版已包含原始 MVP 的完整互動 loop：
+>
+> ```text
+> 個人化情報
+> → 主動送達
+> → 收藏／略過與原因回饋
+> → Soft Preference 小幅更新
+> → 下一次排序改變
+> → 收藏股票建立 Investment Thesis
+> → 新證據 recheck
+> → Thesis Changed / Evidence Conflict notification
+> ```
 
-## 0. 目前狀態
+## 0. C 現在可以直接開始嗎？
 
-### 已可用
+**可以，現在就開始。**
 
-- A Data Layer 的 `screening-output-v1` 已有正式 schema + fixture。
-- B 可直接 ingest A 的 Candidate + verified Evidence + riskFlags。
-- B 有 mock API，前端可完全不靠模型 key 開發。
-- B 有 real API（目前 Gemini-backed）。
-- Top-K、ResearchResult、Evidence source mapping、research history、thesis history API 都已存在。
-- TypeScript contract export：`src/api/contracts.ts`。
-- 最新 CI 已通過 Node typecheck/tests/offline eval 與 `taiwan_data` tests。
+而且目前新增的個人化 / 回饋 / 通知 API 都是 **additive**，原本已交付給 C 的：
 
-### 尚未做成「一個按鈕全自動」的地方
+- `POST /api/research/screening-output`
+- ResearchResult
+- Top-K
+- Evidence source mapping
+- Thesis history
 
-目前 **Node B server 不會自己啟動 Python screening**。
+都沒有被破壞。
 
-完整 real flow 現在是：
+### 最安全 branch 做法
 
-```text
-A: taiwan-data screen
-  ↓ screening-output-v1 JSON
-B: POST /api/research/screening-output
-  ↓
-C: 顯示 Top-K / research result
-```
-
-所以 C 不要直接呼叫 Python/Data Layer。正式 demo orchestration 可以由 backend/script 先產生 A JSON，再送 B。
-
-如果產品之後要讓瀏覽器按「重新篩選」就直接觸發 A，那是下一個 backend orchestration feature，不是目前 C 要自己處理的事。
-
----
-
-# 1. C 現在就可以開始
-
-## 最安全的 branch 做法
-
-**不要把 frontend commit 寫到 `feat/b-agent-mvp`。**
-
-Frontend 自己從 `main` 開 branch：
+Frontend 自己從 `main` 開：
 
 ```bash
 git switch main
@@ -50,7 +41,7 @@ git pull
 git switch -c feat/frontend
 ```
 
-因為 B PR #1 還是 Draft，建議另外開一份 backend checkout 只負責跑 server：
+另外開 backend worktree：
 
 ```bash
 git fetch origin
@@ -59,13 +50,11 @@ cd ../trading_radar_backend
 npm install
 ```
 
-這個 worktree 可以是 detached HEAD；你只是拿它跑 backend，不要在裡面寫 frontend commit。
+Frontend commit 不要寫進 `feat/b-agent-mvp`。
 
 ---
 
-# 2. 前端開發：先用 mock backend
-
-在 backend worktree：
+# 1. 先跑 mock backend
 
 ```bash
 npm run api:mock
@@ -77,37 +66,38 @@ API base：
 http://127.0.0.1:8787
 ```
 
-先確認：
+Mock mode：
+
+- 不需要 Gemini/OpenAI key
+- 不需要 Data SQLite snapshot
+- 不需要 Python CLI
+- 會使用 repo 內真實形狀的 Data PR #5 fixture
+- 支援 profile / feedback / watchlist / thesis / notifications / daily delivery API
+
+先打：
 
 ```http
 GET /health
 ```
 
-預期：
+預期 capability 大致會是：
 
 ```json
 {
   "ok": true,
   "service": "trading-radar-b",
   "thesisTracking": true,
-  "batchResearch": true
+  "batchResearch": true,
+  "personalization": true,
+  "watchlist": true,
+  "notifications": true,
+  "proactiveDelivery": true
 }
 ```
 
-mock mode 不需要：
-
-- Gemini key
-- OpenAI key
-- SQLite data snapshot
-- Python screening
-
-Mock 研究文字會有 `[MOCK]` 前綴，不要把它當正式研究內容。
-
 ---
 
-# 3. Frontend API base 請做成環境變數
-
-不要把 URL 散落在 component 內。
+# 2. API base 用環境變數
 
 例如 Vite：
 
@@ -120,29 +110,119 @@ export const API_BASE =
   import.meta.env.VITE_API_BASE ?? "http://127.0.0.1:8787";
 ```
 
-之後 mock / real backend 都使用同一個 base URL，不需要改 UI code。
+不要把 URL 分散寫在 components。
 
 ---
 
-# 4. C 最先接的 endpoint
+# 3. 建議先固定一個 MVP userId
 
-## Preferred: A screening output -> B Top-K research
+目前 hackathon MVP 沒做登入 / auth。
+
+前端先固定：
+
+```ts
+export const DEMO_USER_ID = "demo-user";
+```
+
+之後所有 profile / feedback / watchlist / notification endpoint 都使用同一個 userId。
+
+不要把這個當正式 auth 設計。
+
+---
+
+# 4. Onboarding / 前測 / 偏好設定
+
+## 取得或建立 profile
+
+```http
+GET /api/users/:userId/profile
+```
+
+## 更新 profile
+
+```http
+PUT /api/users/:userId/profile
+Content-Type: application/json
+```
+
+可更新：
+
+```json
+{
+  "investmentHorizon": "MEDIUM",
+  "riskTolerance": "MEDIUM",
+  "researchStyle": "BALANCED",
+  "hardConstraints": {
+    "excludedIndustries": [],
+    "maxDebtRatio": null,
+    "minLiquidity": 100000000,
+    "excludeDisposition": true
+  },
+  "softPreferences": {
+    "growth": 0.3333,
+    "profitability": 0.3333,
+    "safety": 0.3334
+  }
+}
+```
+
+### Hard Constraints
+
+只能由使用者修改：
+
+- excludedIndustries
+- maxDebtRatio
+- minLiquidity
+- excludeDisposition
+
+**feedback 不會自動放寬 Hard Constraints。**
+
+### Soft Preferences
+
+目前三個可自動微調權重：
+
+- growth
+- profitability
+- safety
+
+## 重設 Soft Preference
+
+```http
+POST /api/users/:userId/profile/reset-soft
+```
+
+## 給 A Data Layer 的 screening profile
+
+```http
+GET /api/users/:userId/screening-profile
+```
+
+這個 endpoint 會輸出 A `taiwan-data screen --profile` 可使用的 profile shape。
+
+---
+
+# 5. 產生 Top-K
+
+## Frontend 開發 / 已有 A output
+
+Preferred endpoint：
 
 ```http
 POST /api/research/screening-output
 Content-Type: application/json
 ```
 
-Repo 已經有 A 的真實 fixture：
+Repo 的真實 fixture：
 
 ```text
 packages/taiwan_data/tests/fixtures/sample_screening_output.json
 ```
 
-Request：
+Request 請帶 userId：
 
 ```json
 {
+  "userId": "demo-user",
   "screeningOutput": {
     "...": "screening-output-v1"
   },
@@ -154,13 +234,30 @@ Request：
 }
 ```
 
-Response shape：
+B 會：
+
+1. validate A contract
+2. preserve upstream Evidence / riskFlags
+3. 套用目前 Soft Preferences
+4. Agent research
+5. verification / publication gate
+6. 回 Top-K
+
+Response：
 
 ```ts
 {
   screeningRunId: string;
   dataVersion: string;
   sourceSnapshot: string | null;
+  personalization?: {
+    userId: string;
+    softPreferences: {
+      growth: number;
+      profitability: number;
+      safety: number;
+    };
+  };
   researched: number;
   rejectedOrSkipped: Array<...>;
   top: Array<{
@@ -175,7 +272,7 @@ Response shape：
 }
 ```
 
-前端主要吃：
+主要 render：
 
 ```text
 top[].result
@@ -183,107 +280,38 @@ top[].result
 
 ---
 
-# 5. Minimal fetch wrapper
+# 6. Top-5 / ResearchResult UI
 
-```ts
-import { API_BASE } from "./config";
+Card 建議：
 
-export async function researchScreeningOutput(
-  screeningOutput: unknown,
-) {
-  const response = await fetch(
-    `${API_BASE}/api/research/screening-output`,
-    {
-      method: "POST",
-      headers: {
-        "content-type": "application/json",
-      },
-      body: JSON.stringify({
-        screeningOutput,
-        options: {
-          topK: 5,
-          researchLimit: 10,
-          concurrency: 2,
-        },
-      }),
-    },
-  );
-
-  const body = await response.json();
-
-  if (!response.ok) {
-    throw new Error(
-      body?.message ??
-        body?.error ??
-        `B API failed: ${response.status}`,
-    );
-  }
-
-  return body;
-}
-```
-
-如果 frontend 與 backend 都是 TypeScript，可參考：
-
-```text
-src/api/contracts.ts
-```
-
-但不要從未 merge 的 backend branch 建立 brittle 的深層 runtime import；前端可以複製/產生自己的 API type layer，等 PR #1 merge 後再統一 import/package strategy。
-
----
-
-# 6. ResearchResult 怎麼畫
-
-最重要欄位：
-
-```ts
-result.status
-result.decision
-result.thesis
-result.keyReasons
-result.claims
-result.risks
-result.invalidationConditions
-result.sources
-result.verificationSummary
-result.researchTrace
-result.stopReason
-```
-
-## Top-5 Card 建議
-
-顯示：
-
-- ticker
-- companyName
 - rank
-- keyReasons 前 1–2 個
-- risks 前 1 個
-- evidence freshness
+- ticker / companyName
+- keyReasons
+- main risk
+- freshness
+- verification quality
 
-可以顯示 quant/evidence score，但要標示成「研究排序指標」。
+不要把：
 
-**不要寫成：**
+- score
+- quantScore
+- evidenceQuality
 
-```text
-上漲機率 91%
-AI 信心 93%
-```
+寫成「上漲機率」或「AI 信心」。
 
-因為 `quantScore` / `evidenceQuality` / `score` 都不是股價上漲機率。
+Research detail：
+
+- thesis
+- claims
+- risks
+- invalidationConditions
+- verificationSummary
+- sources
+- researchTrace
 
 ---
 
-# 7. Claim / Evidence Drawer
-
-每個 claim 有：
-
-```ts
-claim.sourceIds
-```
-
-去 `result.sources` 找相同 `sourceId`：
+# 7. Claim → Evidence
 
 ```ts
 const sourcesForClaim = result.sources.filter((source) =>
@@ -291,7 +319,7 @@ const sourcesForClaim = result.sources.filter((source) =>
 );
 ```
 
-Evidence/source drawer 建議顯示：
+Evidence drawer 建議顯示：
 
 - title
 - publisher
@@ -301,239 +329,183 @@ Evidence/source drawer 建議顯示：
 - dataPeriod
 - URL
 
-Claim status：
+Claim labels：
 
-- `SUPPORTED` -> 已驗證支持
-- `REFUTED` -> 證據反駁
-- `INSUFFICIENT` -> 證據不足
-- `CONFLICTING` -> 來源衝突
+- SUPPORTED → 已驗證支持
+- REFUTED → 證據反駁
+- INSUFFICIENT → 證據不足
+- CONFLICTING → 來源衝突
 
----
-
-# 8. A quantitative evidence 的 UI 注意事項
-
-A 的詳細 contract 在：
+詳細的 A quantitative evidence 語意看：
 
 ```text
 docs/data/candidate-evidence-contract.md
 ```
 
-重要：
-
-- Revenue YoY / operating margin / debt ratio 的單位是 **%**。
-- `344.4` 代表 344.4%，不是 3.444。
-- A 的 percentile 原始 contract 是 0–1。
-- B adapter 內部 `industryPercentile` 會轉成 0–100。
-- `debtRatio.percentile` 是「財務安全度」：越高越安全，不是負債比越高。
-- 20d turnover 是 TWD，UI 建議轉成億元。
-- 頁面建議顯示資料時點：
-  - priceAsOf
-  - revenueAsOf
-  - financialAsOf
-
 ---
 
-# 9. Risk flags 不可以漏掉
+# 8. 收藏 / 略過 + 行為回饋
 
-A 可能給：
+這是原始競賽 loop 的重要功能。
 
-```ts
-riskFlags: ["notice"]
-riskFlags: ["disposition"]
+```http
+POST /api/users/:userId/feedback
+Content-Type: application/json
 ```
 
-B 的 publication gate 已經規定：
+只需要把使用者剛看的：
 
-> 有 upstream risk flag 時，必須找到 grounded risk evidence 並明確標成已處理，否則不能 PUBLISHABLE。
-
-C 可以在 UI 顯示：
-
-- 注意股
-- 處置股
-
-並在 risk detail 看：
-
-```ts
-risk.addressesRiskFlags
+```text
+top[i].result.runId
 ```
 
----
+送回去。
 
-# 10. Rejected 不是 API error
+## 收藏範例
 
-這很重要。
-
-```ts
-result.status === "REJECTED"
+```json
+{
+  "runId": "research-run-id",
+  "action": "SAVE",
+  "reasons": ["GROWTH", "INDUSTRY_TREND"]
+}
 ```
 
-通常代表可信任 Agent 主動拒絕發布，不一定是 backend 壞掉。
+SAVE 可用原因：
+
+- GROWTH
+- FINANCIAL_STABILITY
+- INDUSTRY_TREND
+- ACCEPTABLE_RISK
+- OTHER
+
+## 略過範例
+
+```json
+{
+  "runId": "research-run-id",
+  "action": "SKIP",
+  "reasons": ["HIGH_VOLATILITY"]
+}
+```
+
+SKIP 可用原因：
+
+- HIGH_VOLATILITY
+- FINANCIAL_QUALITY
+- UNFAMILIAR_INDUSTRY
+- INSUFFICIENT_GROWTH
+- VALUATION_CONCERN
+- OTHER
+
+Response 會包含：
+
+```text
+feedback
+preferenceChange
+profile
+watchlistItem?   ← SAVE 時自動建立
+```
+
+### 重點
+
+Feedback 只會對 soft weights 做**小幅 deterministic 調整**。
 
 例如：
 
-- INSUFFICIENT_EVIDENCE
-- UNRESOLVED_CONFLICT
-- NO_RISK_IDENTIFIED
-- BUDGET_EXHAUSTED
-
-UI 建議：
-
 ```text
-目前證據不足，暫不形成研究結論
+SAVE because GROWTH
+→ growth weight 小幅上升
+→ 下一次同一份候選資料排序可能改變
 ```
 
-而不是：
-
-```text
-系統錯誤
-```
-
-真正 HTTP/API failure 才進 error page。
+Hard Constraints 不會改。
 
 ---
 
-# 11. Loading / timeout
+# 9. Preference History
 
-Real B 是同步 MVP endpoint，不是 streaming API。
-
-一次研究可能：
-
-```text
-數十秒 ～ 最長約 3 分鐘
+```http
+GET /api/users/:userId/preference-history
 ```
 
-因為 backend research budget 有約 180 秒 wall-clock 上限。
+UI 建議顯示：
 
-Frontend：
+```text
+Growth      33% → 36%
+Profitability 33% → 32%
+Safety      33% → 32%
 
-- 不要設 10s / 30s 的 request timeout。
-- 建議至少 > 190s，或 MVP 階段不要另外加比 backend 更短的 timeout。
-- 顯示 `researching` loading state。
-- 不要做假的「72% 完成」。
-- 目前沒有 SSE / WebSocket progress stream。
+原因：收藏某股票，理由為成長性
+```
 
-必要 UI state：
+Feedback history：
 
-1. idle
-2. researching
-3. success
-4. rejected / insufficient
-5. HTTP/network error
+```http
+GET /api/users/:userId/feedback
+```
+
+這兩個頁面對應原始 MVP 的「個人偏好變更紀錄」。
 
 ---
 
-# 12. CORS
+# 10. SAVE 會建立 Watchlist + Thesis
 
-Backend 預設：
-
-```env
-CORS_ORIGIN=http://localhost:5173
-```
-
-如果 frontend 不是跑 5173，例如：
+如果 feedback action 是 SAVE，backend 會：
 
 ```text
-http://localhost:3000
+既有 publishable ResearchResult
+→ 建立 Investment Thesis v1
+→ 加入 user watchlist
 ```
 
-啟動 backend 前設定：
+不會為了收藏再重跑一次同樣研究。
 
-PowerShell：
+取得 watchlist：
 
-```powershell
-$env:CORS_ORIGIN="http://localhost:3000"
-npm run api:mock
+```http
+GET /api/users/:userId/watchlist
 ```
 
-或 real：
+移除：
 
-```powershell
-$env:CORS_ORIGIN="http://localhost:3000"
-npm run api
+```http
+DELETE /api/users/:userId/watchlist/:ticker
 ```
 
-目前 backend bind：
+每個 watchlist item 會有：
 
-```text
-127.0.0.1
-```
-
-所以預設只適合同一台電腦上的 browser/frontend。
-
-如果要從手機或另一台電腦直接打 backend，需要另外做 host/network exposure；不要為了測試把 model key 放進 frontend。
+- ticker
+- companyName
+- thesisId
+- sourceResearchRunId
+- candidate
+- createdAt / updatedAt
 
 ---
 
-# 13. 切到 real backend
-
-UI 基本完成後，再切 real B。
-
-backend worktree 建 `.env`：
-
-```env
-GEMINI_API_KEY=...
-LLM_PROVIDER=gemini
-SEARCH_PROVIDER=gemini-google-search
-CORS_ORIGIN=http://localhost:5173
-```
-
-啟動：
-
-```bash
-npm run api
-```
-
-Frontend API base 不變：
-
-```text
-http://127.0.0.1:8787
-```
-
-因此 C 不需要因為 mock -> Gemini -> 未來 OpenAI 而改 component contract。
-
-**C 不應該持有 Gemini/OpenAI key。**
-
----
-
-# 14. 其他 backend endpoints
-
-## Single CandidatePacket
+# 11. Thesis Recheck
 
 ```http
-POST /api/research/runs
+POST /api/users/:userId/watchlist/:ticker/recheck
+Content-Type: application/json
 ```
 
-## Batch CandidatePacket
+Body：
 
-```http
-POST /api/research/batch
+```json
+{
+  "candidate": { "...": "fresh CandidatePacket" },
+  "eventType": "MONTHLY_REVENUE"
+}
 ```
 
-新 A integration 優先使用：
+eventType：
 
-```text
-/api/research/screening-output
-```
-
-避免 Evidence lineage 遺失。
-
-## Research history
-
-```http
-GET /api/research/runs/:runId
-GET /api/research/tickers/:ticker/runs?limit=20
-```
-
-## Saved thesis
-
-```http
-POST /api/theses
-POST /api/theses/:thesisId/recheck
-
-GET /api/theses/:thesisId
-GET /api/theses/:thesisId/versions
-GET /api/theses/:thesisId/events
-```
+- MONTHLY_REVENUE
+- MATERIAL_DISCLOSURE
+- NEWS
+- MANUAL_RECHECK
 
 Thesis state：
 
@@ -543,113 +515,352 @@ Thesis state：
 - WEAKENED
 - INVALIDATED
 
----
-
-# 15. C 不需要做的事
-
-不要在 frontend：
-
-- 直接 call Gemini/OpenAI
-- 存 model API key
-- 重新算 screening metrics
-- 自己 verify claim
-- 自己決定 source tier
-- 自己做 publication gate
-- 自己判斷 thesis 是否 invalidated
-- parse Gemini grounding metadata
-- 顯示 hidden chain-of-thought
-
-這些全部是 B responsibility。
-
-`researchTrace` 是可顯示的 structured operational trace，不是 chain-of-thought。
+重要：如果新 research 因為「明確負面證據」而被 publication gate 拒絕，backend 仍會使用已驗證的負面 evidence 將舊 thesis 標成 WEAKENED / INVALIDATED；不會錯誤地把它當成「沒有變化」。
 
 ---
 
-# 16. 錯誤處理
+# 12. Notification Center
 
-Backend 可能回：
+```http
+GET /api/users/:userId/notifications
+GET /api/users/:userId/notifications?unread=1
+```
 
-- `400 INVALID_SCREENING_OUTPUT`
-- `400 SCREENING_ADAPTER_ERROR`
-- `400 INVALID_CANDIDATE_PACKET`
-- `404 RUN_NOT_FOUND`
-- `404 THESIS_NOT_FOUND`
-- `413 REQUEST_BODY_TOO_LARGE`
-- `500 INTERNAL_ERROR`
+目前 notification type：
 
-開發階段遇到 400：
+- DAILY_RESEARCH_READY
+- THESIS_CHANGED
+- EVIDENCE_CONFLICT
 
-1. 不要先在 frontend workaround contract。
-2. 先看 response `error / message / issues`。
-3. 對照：
-   - `docs/INTEGRATION.md`
-   - `docs/data/candidate-evidence-contract.md`
-4. 如果 contract 真的需要改，A/B/C 一起改 schema，不要 C 自己猜欄位。
+標記已讀：
+
+```http
+POST /api/users/:userId/notifications/:notificationId/read
+```
 
 ---
 
-# 17. 開發順序
+# 13. Browser Notification 是 C 的責任
 
-## C0 — 先完成
+Backend 已負責：
 
-用 `npm run api:mock`：
+```text
+event detection
+→ notification record
+→ unread/read state
+→ notification API
+```
 
-- Top 5 list
-- Research detail
-- Claim status
-- Evidence/source drawer
-- Risk / riskFlag
-- Loading
-- Rejected
-- Error
+C 負責真正呼叫 Browser Notification API。
 
-## C1
+最小版本：
 
-- Save thesis
-- Thesis version history
-- Event timeline
-- Research trace accordion
+```ts
+export async function ensureNotificationPermission() {
+  if (!("Notification" in window)) return false;
 
-## C2 — Integration checkpoint
+  if (Notification.permission === "granted") {
+    return true;
+  }
 
-切到：
+  const permission = await Notification.requestPermission();
+  return permission === "granted";
+}
+
+export function showRadarNotification(item: {
+  notificationId: string;
+  title: string;
+  message: string;
+}) {
+  if (Notification.permission !== "granted") return;
+
+  new Notification(item.title, {
+    body: item.message,
+    tag: item.notificationId,
+  });
+}
+```
+
+MVP 可以：
+
+1. page load / interval poll unread notifications
+2. 新 notification 顯示 Browser Notification
+3. 成功顯示後呼叫 mark-read endpoint
+
+不要把 model key 放進 Service Worker 或 frontend。
+
+---
+
+# 14. 主動送達 / Daily Research
+
+Mock backend 已可 demo：
+
+```http
+POST /api/users/:userId/daily-research
+```
+
+它會：
+
+```text
+User Profile
+→ screening
+→ Top-K research
+→ DAILY_RESEARCH_READY notification
+```
+
+同一個 Taipei local date 預設不重複跑成功任務。
+
+Delivery history：
+
+```http
+GET /api/users/:userId/delivery-runs
+```
+
+---
+
+# 15. Real 自動排程
+
+Real B 可以自行啟動 Data Layer screening。
+
+先安裝：
+
+```bash
+python -m pip install -e "packages/taiwan_data"
+```
+
+`.env`：
+
+```env
+TAIWAN_DATA_DB=/path/to/taiwan-data.sqlite
+TAIWAN_DATA_CLI=taiwan-data
+
+ENABLE_DAILY_SCHEDULER=true
+DAILY_RESEARCH_AFTER_HOUR=17
+DAILY_SCHEDULER_INTERVAL_MS=3600000
+```
+
+Real server：
 
 ```bash
 npm run api
 ```
 
-用一次真正 A `screening-output-v1` 做 end-to-end。
+Scheduler：
+
+- timezone = Asia/Taipei
+- Mon–Fri
+- 17:00 後檢查
+- 本機 17:00 關閉、18:00 才開 → 會 catch up missed run
+- 已成功執行同日不重複
+- 如果最新 `priceAsOf` 不是今天，不會假裝成「今日研究」
+- 會保持 WAITING_FOR_FRESH_DATA，下一輪再檢查
+
+這避免舊資料被標成今日結果。
 
 ---
 
-# 18. C 端完成定義
+# 16. Loading / timeout
 
-C 可以說「後端已接好」至少要符合：
+Real research 是同步 MVP API。
 
-- [ ] `GET /health` 正常
-- [ ] mock `POST /api/research/screening-output` 成功
-- [ ] Top-K cards 能 render
-- [ ] ResearchResult detail 能 render
-- [ ] claim -> sourceIds -> sources 可以點開
-- [ ] REJECTED 不被當成 HTTP error
-- [ ] notice / disposition 有顯示
+單次可能：
+
+```text
+數十秒 ～ 約 3 分鐘
+```
+
+C：
+
+- 不要用 10s / 30s timeout
+- 顯示 researching
+- 不做假的百分比 progress
+- 目前沒有 SSE/WebSocket
+
+必要 state：
+
+1. idle
+2. researching
+3. success
+4. rejected / insufficient
+5. network / HTTP error
+
+---
+
+# 17. REJECTED 不是系統錯誤
+
+```ts
+result.status === "REJECTED"
+```
+
+代表 Agent 主動拒絕發布研究結論。
+
+可能原因：
+
+- INSUFFICIENT_EVIDENCE
+- UNRESOLVED_CONFLICT
+- NO_RISK_IDENTIFIED
+- BUDGET_EXHAUSTED
+- SOURCE_FAILURE
+
+UI：
+
+```text
+目前證據不足，暫不形成研究結論
+```
+
+而不是「系統壞掉」。
+
+---
+
+# 18. Risk Flags
+
+A 可能提供：
+
+```text
+notice
+disposition
+```
+
+必須顯示。
+
+B publication gate 已保證：
+
+> upstream risk flag 沒有被 grounded risk evidence 明確處理時，不可 PUBLISHABLE。
+
+Risk item 可能有：
+
+```ts
+risk.addressesRiskFlags
+```
+
+---
+
+# 19. CORS
+
+預設：
+
+```env
+CORS_ORIGIN=http://localhost:5173
+```
+
+如果 frontend 是 3000：
+
+```powershell
+$env:CORS_ORIGIN="http://localhost:3000"
+npm run api:mock
+```
+
+Real 同理。
+
+Backend 預設 bind `127.0.0.1`，所以目前適合同一台電腦 demo。
+
+---
+
+# 20. C 不需要做的事
+
+不要在 frontend：
+
+- call Gemini/OpenAI
+- 保存 model key
+- 重算 screening metrics
+- verify claims
+- 決定 source tier
+- 做 publication gate
+- 判斷 thesis status
+- parse Gemini grounding metadata
+- 顯示 hidden chain-of-thought
+
+`researchTrace` 是可顯示的 structured operational trace，不是 chain-of-thought。
+
+---
+
+# 21. 錯誤處理
+
+常見：
+
+- 400 INVALID_SCREENING_OUTPUT
+- 400 SCREENING_ADAPTER_ERROR
+- 400 INVALID_CANDIDATE_PACKET
+- 400 INVALID_FEEDBACK
+- 400 INVALID_USER_PROFILE
+- 404 RESEARCH_RUN_NOT_FOUND
+- 404 WATCHLIST_ITEM_NOT_FOUND
+- 404 THESIS_NOT_FOUND
+- 404 NOTIFICATION_NOT_FOUND
+- 413 REQUEST_BODY_TOO_LARGE
+- 500 INTERNAL_ERROR
+
+遇到 contract error 不要先在 C workaround；先對照：
+
+- `docs/INTEGRATION.md`
+- `docs/data/candidate-evidence-contract.md`
+- `src/api/contracts.ts`
+
+---
+
+# 22. 建議 C 開發順序
+
+## C0 — 可以立刻做
+
+用 `npm run api:mock`：
+
+- onboarding/profile
+- Top 5
+- research detail
+- evidence drawer
+- risk/riskFlags
+- loading/rejected/error
+
+## C1 — 原始競賽 loop
+
+- Save / Skip reasons
+- preference delta UI
+- watchlist
+- thesis history
+- notification center
+- Browser Notification
+
+## C2 — real integration
+
+- mock → `npm run api`
+- 真實 screening-output
+- 一次 real Gemini research
+- 一次 Thesis Changed notification demo
+
+---
+
+# 23. C 完成定義
+
+- [ ] GET /health
+- [ ] GET/PUT user profile
+- [ ] POST screening-output with userId
+- [ ] Top-K cards render
+- [ ] ResearchResult detail render
+- [ ] claim → sourceIds → sources render
+- [ ] SAVE / SKIP reasons 可送
+- [ ] preference change 顯示
+- [ ] 同一 fixture 回饋前後 ranking 可觀察差異
+- [ ] SAVE 後 watchlist 有項目
+- [ ] Thesis history render
+- [ ] notification center render
+- [ ] Browser Notification 至少 demo 一次
+- [ ] REJECTED 不當 HTTP error
+- [ ] notice / disposition 顯示
 - [ ] loading 可撐長 request
-- [ ] backend URL 來自 env/config
-- [ ] frontend 沒有 model API key
-- [ ] mock -> real backend 不需改 response parsing
-
-完成這些後，再做真實 Gemini integration check。
+- [ ] backend URL 來自 env
+- [ ] frontend 無 model key
+- [ ] mock → real 不需改 response parsing
 
 ---
 
-# 19. 其他文件
+# 24. 其他文件
 
-**C 先看本文件。**
+先看本文件。
 
-需要更細時：
+深入規格：
 
-- `docs/INTEGRATION.md` — HTTP / A-B-C contract
-- `docs/data/candidate-evidence-contract.md` — A Candidate + Evidence 語意
-- `src/api/contracts.ts` — B TypeScript contracts
-- `packages/taiwan_data/tests/fixtures/sample_screening_output.json` — 真實 A fixture
-- `docs/B_AGENT_MVP.md` — B architecture / publication policy
+- `docs/INTEGRATION.md`
+- `docs/data/candidate-evidence-contract.md`
+- `src/api/contracts.ts`
+- `packages/taiwan_data/tests/fixtures/sample_screening_output.json`
+- `docs/B_AGENT_MVP.md`
