@@ -10,7 +10,7 @@ from pathlib import Path
 from .bootstrap import build_snapshot, refresh_manifest
 from .db import DEFAULT_DB_ENV, DataStore
 from .distribution import DEFAULT_SOURCE, KINDS, create_snapshot, download_snapshot
-from .screening import Profile, ScreeningConfig, get_candidates
+from .screening import Profile, ScreeningConfig, get_candidate_snapshot, get_candidates
 from .service import BACKFILL_START, RefreshService
 
 REFRESH_TARGETS = ("all", "market", "stocks", "revenue", "financials", "margin",
@@ -77,6 +77,13 @@ def build_parser() -> argparse.ArgumentParser:
                         help="不排除處置中股票（預設排除）")
     screen.add_argument("--no-reuse", action="store_true", help="即使輸入相同也建立新的 run")
 
+    inspect = sub.add_parser("inspect", help="輸出單一股票的最新 Candidate + Evidence snapshot")
+    inspect.add_argument("--db", default=os.getenv(DEFAULT_DB_ENV))
+    inspect.add_argument("--stock-id", required=True)
+    inspect.add_argument("--output", help="輸出 JSON 路徑；省略則印到 stdout")
+    inspect.add_argument("--as-of", type=_date, help="預設為今天（Asia/Taipei）")
+    inspect.add_argument("--profile", help="Profile JSON 檔（只使用 soft weights；hard constraints 不套用）")
+
     snapshot = sub.add_parser("snapshot", help="建立可分發的壓縮快照（full 或 demo）與 manifest")
     snapshot.add_argument("--db", default=os.getenv(DEFAULT_DB_ENV))
     snapshot.add_argument("--out-dir", required=True)
@@ -122,6 +129,28 @@ def main(argv: list[str] | None = None) -> None:
         result = {"output": str(path.resolve()), "runId": run["runId"], "asOfDate": run["asOfDate"],
                   "revenueAsOf": run["revenueAsOf"], "financialAsOf": run["financialAsOf"],
                   "candidates": len(result["candidates"]), "evidence": len(result["evidence"])}
+    elif args.command == "inspect":
+        if not args.db:
+            raise ValueError(f"請用 --db 或 {DEFAULT_DB_ENV} 指定 SQLite 路徑")
+        profile_data = json.loads(Path(args.profile).read_text(encoding="utf-8")) if args.profile else {}
+        result = get_candidate_snapshot(
+            DataStore(args.db),
+            args.stock_id,
+            Profile.from_dict(profile_data),
+            as_of_date=args.as_of,
+        )
+        if args.output is None:
+            print(json.dumps(result, ensure_ascii=False, indent=2))
+            return
+        path = Path(args.output)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps(result, ensure_ascii=False, indent=2), encoding="utf-8")
+        result = {
+            "output": str(path.resolve()),
+            "stockId": args.stock_id,
+            "asOfDate": result["run"]["asOfDate"],
+            "priceAsOf": result["run"]["priceAsOf"],
+        }
     elif args.command == "snapshot":
         result = create_snapshot(args.db, args.out_dir, kind=args.kind, version=args.version)
     elif args.command == "download":
