@@ -862,7 +862,29 @@ Backend 預設 bind `127.0.0.1`，所以目前適合同一台電腦 demo。
 
 ---
 
-# 24. 其他文件
+# 24. Admin / 執行狀態頁
+
+原始 MVP 的管理員頁面可以直接接：
+
+```http
+GET  /api/admin/status
+POST /api/admin/model-check
+GET  /api/admin/data-status
+```
+
+用途：
+
+- 顯示目前 LLM / Search provider 與 model 名稱
+- 只顯示「credential 是否已配置」，**絕不回傳 key**
+- 手動測試 model API 是否連線
+- 顯示 Data Layer table / dataset refresh status
+- 顯示 scheduler 是否啟用與最近 delivery run
+
+Mock backend 也有相同 endpoint，方便 C 先完成畫面。
+
+---
+
+# 25. 其他文件
 
 先看本文件。
 
