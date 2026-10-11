@@ -10,9 +10,9 @@ import type { WatchlistItem } from "./types.js";
 export class WatchlistService {
   constructor(
     private readonly store: WatchlistStore,
-    private readonly research: ResearchService,
-    private readonly theses: ThesisService,
-    private readonly thesisResearch: ThesisResearchService,
+    private readonly research: Pick<ResearchService, "get">,
+    private readonly theses: Pick<ThesisService, "createFromResearch">,
+    private readonly thesisResearch: Pick<ThesisResearchService, "recheck">,
     private readonly notifications?: NotificationService,
   ) {}
 
