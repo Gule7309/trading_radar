@@ -247,6 +247,7 @@ describe("MVP offline eval invariants E01-E10", () => {
     expect(evaluatePublicationGate(state)).toEqual({
       ok: false,
       reason: "UNSUPPORTED_CORE_CLAIM",
+      claimIds: ["c1"],
     });
   });
 
