@@ -47,11 +47,25 @@ export function enforceControllerPolicy(
   if (
     action.type === "SEARCH_OFFICIAL" &&
     action.dataset === "MONTHLY_REVENUE" &&
-    hasUpstreamMonthlyRevenue(state.candidate)
+    hasUpstreamMonthlyRevenue(state.candidate) &&
+    state.claims.length === 0
   ) {
     return forceVerify(
       "Verified monthly-revenue evidence already arrived from screening-output-v1; reuse it instead of repeating the same official lookup.",
     );
+  }
+
+  if (
+    action.type === "VERIFY" &&
+    state.claims.length > 0 &&
+    !state.evidenceDirty
+  ) {
+    return {
+      reasonCode: "POLICY_SKIP_REDUNDANT_VERIFY",
+      summary:
+        "No new evidence has arrived since the previous verification pass; use the deterministic publication gate instead of re-verifying identical evidence.",
+      action: { type: "FINALIZE" },
+    };
   }
 
   if (
