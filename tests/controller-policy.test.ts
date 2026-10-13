@@ -153,4 +153,40 @@ describe("enforceControllerPolicy", () => {
     expect(decision.action.type).toBe("FINALIZE");
     expect(decision.reasonCode).toBe("POLICY_SKIP_UNNEEDED_SKEPTIC");
   });
+  it("does not spend the skeptic round when grounded risk evidence is still missing", () => {
+    const current = state();
+    current.claims = [
+      {
+        claimId: "core-1",
+        text: "Revenue grew.",
+        category: "FINANCIAL",
+        importance: "CORE",
+        status: "SUPPORTED",
+      },
+    ];
+    current.evidence = [
+      {
+        evidenceId: "e1",
+        claimId: "core-1",
+        sourceId: "official-1",
+        evidenceText: "Revenue grew.",
+        verificationResult: "SUPPORTED",
+        verifierReason: "official",
+      },
+    ];
+    current.evidenceDirty = false;
+
+    const decision = enforceControllerPolicy(current, {
+      reasonCode: "MODEL_SKEPTIC",
+      summary: "Run skeptic.",
+      action: {
+        type: "RUN_SKEPTIC",
+        thesisDraft: "Draft thesis",
+      },
+    });
+
+    expect(decision.action.type).toBe("FINALIZE");
+    expect(decision.reasonCode).toBe("POLICY_SKIP_UNNEEDED_SKEPTIC");
+  });
+
 });
