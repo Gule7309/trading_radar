@@ -77,7 +77,6 @@ export function shouldRunSkeptic(state: ResearchState): boolean {
     state.budget.skepticRounds < state.budget.maxSkepticRounds &&
     (hasCoreConflict ||
       hasForwardLookingOrCausalCoreClaim ||
-      noPrimaryCoreEvidence ||
-      state.risks.length === 0)
+      noPrimaryCoreEvidence)
   );
 }
