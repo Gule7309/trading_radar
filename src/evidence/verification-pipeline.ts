@@ -53,6 +53,13 @@ export class DefaultVerificationPipeline implements VerificationPipeline {
   ) {}
 
   async run(state: ResearchState): Promise<void> {
+    const previousEvidenceByPair = new Map(
+      state.evidence.map((item) => [
+        `${item.claimId}::${item.sourceId}`,
+        item,
+      ]),
+    );
+
     const eligibleSources = eligibleEvidenceSources(
       state.sources,
       state.candidate,
@@ -97,7 +104,17 @@ export class DefaultVerificationPipeline implements VerificationPipeline {
         const source = sourceById.get(sourceId);
         if (!source) continue;
 
-        const verification = await this.textualVerifier.verify(claim, source);
+        const pairKey = `${claim.claimId}::${source.sourceId}`;
+        const cached = previousEvidenceByPair.get(pairKey);
+
+        if (cached) {
+          claimEvidence.push(cached);
+          state.evidence.push(cached);
+          continue;
+        }
+
+        const verification =
+          await this.textualVerifier.verify(claim, source);
         const evidence: EvidenceLink = {
           evidenceId: stableEvidenceId(
             claim.claimId,
