@@ -103,6 +103,7 @@ describe("evaluatePublicationGate", () => {
     expect(evaluatePublicationGate(state)).toEqual({
       ok: false,
       reason: "UNSUPPORTED_CORE_CLAIM",
+      claimIds: ["claim-1"],
     });
   });
 
@@ -113,6 +114,7 @@ describe("evaluatePublicationGate", () => {
     expect(evaluatePublicationGate(state)).toEqual({
       ok: false,
       reason: "CORE_CLAIM_DISCOVERY_ONLY",
+      claimIds: ["claim-1"],
     });
   });
 
@@ -123,6 +125,7 @@ describe("evaluatePublicationGate", () => {
     expect(evaluatePublicationGate(state)).toEqual({
       ok: false,
       reason: "FINANCIAL_CORE_WITHOUT_PRIMARY",
+      claimIds: ["claim-1"],
     });
   });
 
