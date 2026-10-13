@@ -149,12 +149,15 @@ export class DefaultVerificationPipeline implements VerificationPipeline {
     const validSourceIds = new Set(
       textualSources.map((source) => source.sourceId),
     );
+    const previousRisks = state.risks.filter((risk) =>
+      risk.sourceIds.some((sourceId) => validSourceIds.has(sourceId)),
+    );
     const extractedRisks =
       textualSources.length > 0
         ? await this.riskExtractor.extract(projectedState)
         : [];
 
-    state.risks = extractedRisks
+    const normalizedRisks = extractedRisks
       .map((risk) => ({
         ...risk,
         sourceIds: risk.sourceIds.filter((sourceId) =>
@@ -162,5 +165,13 @@ export class DefaultVerificationPipeline implements VerificationPipeline {
         ),
       }))
       .filter((risk) => risk.sourceIds.length > 0);
+
+    const risksById = new Map(
+      previousRisks.map((risk) => [risk.riskId, risk]),
+    );
+    for (const risk of normalizedRisks) {
+      risksById.set(risk.riskId, risk);
+    }
+    state.risks = Array.from(risksById.values());
   }
 }
