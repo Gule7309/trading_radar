@@ -40,7 +40,7 @@ function deriveGroundedUpstreamFlagRisks(
   for (const flag of flags) {
     const pattern =
       flag === "notice"
-        ? /注意股|注意股票|列為注意|交易異常|交易波動|股價波動|自結損益|公告自結/i
+        ? /注意股|注意股票|列為注意|交易異常|交易波動|股價波動|自結損益|公告自結|notice stock|abnormal trading|self-reported financial/i
         : /處置股|處置股票|處置措施|分盤交易/i;
 
     const source = eligibleSources.find((item) =>
