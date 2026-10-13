@@ -1,0 +1,223 @@
+import { createHash } from "node:crypto";
+import type {
+  Claim,
+  EvidenceLink,
+  ResearchState,
+  RiskItem,
+} from "../domain/research.js";
+import { detectVerificationConflict } from "./conflict-detector.js";
+import {
+  stableClaimId,
+  type ClaimExtractor,
+} from "./claim-extractor.js";
+import type { TextualVerifier } from "./textual-verifier.js";
+import type { RiskExtractor } from "./risk-extractor.js";
+import { eligibleEvidenceSources } from "./source-eligibility.js";
+import { verifyQuantSignalsAgainstOfficialSources } from "./quant-signal-verifier.js";
+
+export interface VerificationPipeline {
+  run(state: ResearchState): Promise<void>;
+}
+
+function stableEvidenceId(
+  claimId: string,
+  sourceId: string,
+  result: string,
+): string {
+  return `evidence-${createHash("sha256")
+    .update(`${claimId}\n${sourceId}\n${result}`)
+    .digest("hex")
+    .slice(0, 16)}`;
+}
+
+function deriveGroundedUpstreamFlagRisks(
+  state: ResearchState,
+  eligibleSources: ResearchState["sources"],
+): RiskItem[] {
+  const flags = state.candidate.riskFlags ?? [];
+  const risks: RiskItem[] = [];
+
+  for (const flag of flags) {
+    const pattern =
+      flag === "notice"
+        ? /注意股|注意股票|列為注意|交易異常|交易波動|股價波動|自結損益|公告自結|notice stock|abnormal trading|self-reported financial/i
+        : /處置股|處置股票|處置措施|分盤交易/i;
+
+    const source = eligibleSources.find((item) =>
+      pattern.test(
+        [item.title, item.snippet].join(" "),
+      ),
+    );
+
+    if (!source) continue;
+
+    risks.push({
+      riskId: `risk-upstream-${flag}-${source.sourceId}`,
+      title:
+        flag === "notice"
+          ? "近期交易異常／注意股風險"
+          : "近期處置股交易風險",
+      explanation:
+        flag === "notice"
+          ? "直接取得的當期來源明確提及注意股、交易異常或相關自結公告，代表近期價格／交易波動需要持續追蹤。"
+          : "直接取得的當期來源明確提及處置股或處置交易措施，代表近期交易條件與價格波動風險需要持續追蹤。",
+      sourceIds: [source.sourceId],
+      addressesRiskFlags: [flag],
+    });
+  }
+
+  return risks;
+}
+
+function aggregateClaimStatus(
+  evidence: EvidenceLink[],
+): Claim["status"] {
+  const hasSupported = evidence.some(
+    (item) => item.verificationResult === "SUPPORTED",
+  );
+  const hasRefuted = evidence.some(
+    (item) => item.verificationResult === "REFUTED",
+  );
+
+  if (hasSupported && hasRefuted) return "CONFLICTING";
+  if (hasSupported) return "SUPPORTED";
+  if (hasRefuted) return "REFUTED";
+  return "INSUFFICIENT";
+}
+
+export class DefaultVerificationPipeline implements VerificationPipeline {
+  constructor(
+    private readonly claimExtractor: ClaimExtractor,
+    private readonly textualVerifier: TextualVerifier,
+    private readonly riskExtractor: RiskExtractor,
+  ) {}
+
+  async run(state: ResearchState): Promise<void> {
+    const previousEvidenceByPair = new Map(
+      state.evidence.map((item) => [
+        `${item.claimId}::${item.sourceId}`,
+        item,
+      ]),
+    );
+
+    const eligibleSources = eligibleEvidenceSources(
+      state.sources,
+      state.candidate,
+    );
+    const textualSources = eligibleSources.filter(
+      (source) => source.metadata?.origin !== "screening-output-v1",
+    );
+    const projectedState: ResearchState = {
+      ...state,
+      sources: textualSources,
+    };
+
+    const extractedClaims =
+      textualSources.length > 0
+        ? await this.claimExtractor.extract(projectedState)
+        : [];
+    const sourceById = new Map(
+      textualSources.map((source) => [source.sourceId, source]),
+    );
+    const quant = verifyQuantSignalsAgainstOfficialSources(state);
+
+    state.claims = [...quant.claims];
+    state.evidence = [...quant.evidence];
+    state.conflicts = [];
+
+    for (const extracted of extractedClaims) {
+      const claim: Claim = {
+        claimId: stableClaimId(extracted.text),
+        text: extracted.text,
+        category: extracted.category,
+        importance: extracted.importance,
+        status: "PENDING",
+      };
+
+      if (state.claims.some((item) => item.claimId === claim.claimId)) {
+        continue;
+      }
+
+      const claimEvidence: EvidenceLink[] = [];
+
+      for (const sourceId of extracted.sourceIds) {
+        const source = sourceById.get(sourceId);
+        if (!source) continue;
+
+        const pairKey = `${claim.claimId}::${source.sourceId}`;
+        const cached = previousEvidenceByPair.get(pairKey);
+
+        if (cached) {
+          claimEvidence.push(cached);
+          state.evidence.push(cached);
+          continue;
+        }
+
+        const verification =
+          await this.textualVerifier.verify(claim, source);
+        const evidence: EvidenceLink = {
+          evidenceId: stableEvidenceId(
+            claim.claimId,
+            source.sourceId,
+            verification.result,
+          ),
+          claimId: claim.claimId,
+          sourceId: source.sourceId,
+          evidenceText:
+            verification.evidenceSpan?.trim() ||
+            source.snippet.slice(0, 800),
+          verificationResult: verification.result,
+          verifierReason: verification.reason,
+        };
+
+        claimEvidence.push(evidence);
+        state.evidence.push(evidence);
+      }
+
+      claim.status = aggregateClaimStatus(claimEvidence);
+      state.claims.push(claim);
+    }
+
+    for (const claim of state.claims) {
+      const conflict = detectVerificationConflict(claim, state.evidence);
+      if (conflict) {
+        claim.status = "CONFLICTING";
+        state.conflicts.push(conflict);
+      }
+    }
+
+    const validSourceIds = new Set(
+      textualSources.map((source) => source.sourceId),
+    );
+    const previousRisks = state.risks.filter((risk) =>
+      risk.sourceIds.some((sourceId) => validSourceIds.has(sourceId)),
+    );
+    const extractedRisks =
+      textualSources.length > 0
+        ? await this.riskExtractor.extract(projectedState)
+        : [];
+
+    const normalizedRisks = extractedRisks
+      .map((risk) => ({
+        ...risk,
+        sourceIds: risk.sourceIds.filter((sourceId) =>
+          validSourceIds.has(sourceId),
+        ),
+      }))
+      .filter((risk) => risk.sourceIds.length > 0);
+
+    const deterministicFlagRisks =
+      deriveGroundedUpstreamFlagRisks(state, textualSources);
+
+    const risksById = new Map(
+      previousRisks.map((risk) => [risk.riskId, risk]),
+    );
+    for (const risk of [
+      ...normalizedRisks,
+      ...deterministicFlagRisks,
+    ]) {
+      risksById.set(risk.riskId, risk);
+    }
+    state.risks = Array.from(risksById.values());
+  }
+}

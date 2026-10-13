@@ -1,3 +1,13 @@
+# Node
+node_modules/
+coverage/
+*.log
+.env
+.env.*
+.DS_Store
+*.sqlite
+*.sqlite-*
+
 # Python
 .venv/
 __pycache__/
@@ -7,5 +17,5 @@ build/
 dist/
 *.egg-info/
 
-# 本機資料與排程紀錄：SQLite snapshot 約 1 GB，不進 Git history（見 docs/data/README.md）
+# 本機資料與排程紀錄：SQLite snapshot 約 1 GB，不進 Git history
 var/
