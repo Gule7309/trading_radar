@@ -36,6 +36,13 @@ class FixtureTextualVerifier implements TextualVerifier {
   }
 }
 
+
+class EmptyRiskExtractor implements RiskExtractor {
+  async extract() {
+    return [];
+  }
+}
+
 class FixtureRiskExtractor implements RiskExtractor {
   async extract() {
     return [
@@ -134,4 +141,29 @@ describe("DefaultVerificationPipeline", () => {
     expect(current.risks[0]?.sourceIds).toEqual(["s-news"]);
     expect(current.conflicts).toHaveLength(0);
   });
+  it("preserves an already grounded risk when a later verification pass extracts no new risks", async () => {
+    const current = state();
+    current.risks = [
+      {
+        riskId: "risk-existing",
+        title: "Notice-stock volatility",
+        explanation: "A fetched current source grounds the notice-stock risk.",
+        sourceIds: ["s-news"],
+        addressesRiskFlags: [],
+      },
+    ];
+
+    const pipeline = new DefaultVerificationPipeline(
+      new FixtureClaimExtractor(),
+      new FixtureTextualVerifier(),
+      new EmptyRiskExtractor(),
+    );
+
+    await pipeline.run(current);
+
+    expect(current.risks).toHaveLength(1);
+    expect(current.risks[0]?.riskId).toBe("risk-existing");
+    expect(current.risks[0]?.sourceIds).toEqual(["s-news"]);
+  });
+
 });
