@@ -3,6 +3,7 @@ import type {
   Claim,
   EvidenceLink,
   ResearchState,
+  RiskItem,
 } from "../domain/research.js";
 import { detectVerificationConflict } from "./conflict-detector.js";
 import {
@@ -27,6 +28,45 @@ function stableEvidenceId(
     .update(`${claimId}\n${sourceId}\n${result}`)
     .digest("hex")
     .slice(0, 16)}`;
+}
+
+function deriveGroundedUpstreamFlagRisks(
+  state: ResearchState,
+  eligibleSources: ResearchState["sources"],
+): RiskItem[] {
+  const flags = state.candidate.riskFlags ?? [];
+  const risks: RiskItem[] = [];
+
+  for (const flag of flags) {
+    const pattern =
+      flag === "notice"
+        ? /注意股|注意股票|列為注意|交易異常|交易波動|股價波動|自結損益|公告自結/i
+        : /處置股|處置股票|處置措施|分盤交易/i;
+
+    const source = eligibleSources.find((item) =>
+      pattern.test(
+        [item.title, item.snippet].join(" "),
+      ),
+    );
+
+    if (!source) continue;
+
+    risks.push({
+      riskId: `risk-upstream-${flag}-${source.sourceId}`,
+      title:
+        flag === "notice"
+          ? "近期交易異常／注意股風險"
+          : "近期處置股交易風險",
+      explanation:
+        flag === "notice"
+          ? "直接取得的當期來源明確提及注意股、交易異常或相關自結公告，代表近期價格／交易波動需要持續追蹤。"
+          : "直接取得的當期來源明確提及處置股或處置交易措施，代表近期交易條件與價格波動風險需要持續追蹤。",
+      sourceIds: [source.sourceId],
+      addressesRiskFlags: [flag],
+    });
+  }
+
+  return risks;
 }
 
 function aggregateClaimStatus(
@@ -166,10 +206,16 @@ export class DefaultVerificationPipeline implements VerificationPipeline {
       }))
       .filter((risk) => risk.sourceIds.length > 0);
 
+    const deterministicFlagRisks =
+      deriveGroundedUpstreamFlagRisks(state, textualSources);
+
     const risksById = new Map(
       previousRisks.map((risk) => [risk.riskId, risk]),
     );
-    for (const risk of normalizedRisks) {
+    for (const risk of [
+      ...normalizedRisks,
+      ...deterministicFlagRisks,
+    ]) {
       risksById.set(risk.riskId, risk);
     }
     state.risks = Array.from(risksById.values());
