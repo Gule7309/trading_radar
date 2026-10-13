@@ -69,6 +69,7 @@ function state(): ResearchState {
       quantScore: 0.9,
       quantSignals: [],
       hardConstraintsPassed: true,
+      riskFlags: ["notice"],
     },
     phase: "VERIFY",
     knownFacts: [],
@@ -99,7 +100,8 @@ function state(): ResearchState {
         publishedAt: "2026-10-06",
         retrievedAt: "2026-10-07T00:00:00Z",
         ticker: "2330",
-        snippet: "Margin pressure was reported.",
+        snippet:
+          "Fixture Company was listed as a notice stock after abnormal trading; the company published self-reported financial results.",
         contentHash: "news",
         untrustedContent: true,
       },
@@ -137,8 +139,13 @@ describe("DefaultVerificationPipeline", () => {
     expect(current.claims[0]?.status).toBe("SUPPORTED");
     expect(current.evidence).toHaveLength(1);
     expect(current.evidence[0]?.sourceId).toBe("s-official");
-    expect(current.risks).toHaveLength(1);
+    expect(current.risks).toHaveLength(2);
     expect(current.risks[0]?.sourceIds).toEqual(["s-news"]);
+    expect(
+      current.risks.some((risk) =>
+        risk.addressesRiskFlags?.includes("notice"),
+      ),
+    ).toBe(true);
     expect(current.conflicts).toHaveLength(0);
   });
   it("preserves an already grounded risk when a later verification pass extracts no new risks", async () => {
