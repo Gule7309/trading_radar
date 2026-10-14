@@ -148,8 +148,9 @@ describe("DefaultVerificationPipeline", () => {
     ).toBe(true);
     expect(current.conflicts).toHaveLength(0);
   });
-  it("preserves an already grounded risk when a later verification pass extracts no new risks", async () => {
+  it.each([false, true])("preserves grounded risks across empty extraction passes (notice flag: %s)", async (hasNoticeFlag) => {
     const current = state();
+    current.candidate.riskFlags = hasNoticeFlag ? ["notice"] : [];
     current.risks = [
       {
         riskId: "risk-existing",
@@ -166,11 +167,23 @@ describe("DefaultVerificationPipeline", () => {
       new EmptyRiskExtractor(),
     );
 
+    const existingRisk = structuredClone(current.risks[0]);
     await pipeline.run(current);
 
-    expect(current.risks).toHaveLength(1);
-    expect(current.risks[0]?.riskId).toBe("risk-existing");
-    expect(current.risks[0]?.sourceIds).toEqual(["s-news"]);
+    const expectedRisks = [
+      existingRisk,
+      ...(hasNoticeFlag ? [expect.objectContaining({
+        riskId: "risk-upstream-notice-s-news",
+        sourceIds: ["s-news"],
+        addressesRiskFlags: ["notice"],
+      })] : []),
+    ];
+    expect(current.risks).toEqual(expectedRisks);
+
+    // A repeated VERIFY must preserve both risks without duplicating the
+    // deterministic notice risk, even when the model extracts nothing.
+    await pipeline.run(current);
+    expect(current.risks).toEqual(expectedRisks);
   });
 
 });
