@@ -98,7 +98,7 @@ export const ResearchActionSchema = z.discriminatedUnion("type", [
 ]);
 
 export const ControllerDecisionSchema = z.object({
-  reasonCode: z.string().min(1).max(80),
-  summary: z.string().min(1).max(280),
+  reasonCode: z.string().min(1).max(80).describe("Short operational label, 1–80 characters."),
+  summary: z.string().min(1).max(280).describe("One brief operational sentence, 1–280 characters, preferably under 120. No analysis."),
   action: ResearchActionSchema,
 });

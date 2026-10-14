@@ -69,6 +69,7 @@ export class LlmResearchController implements ResearchController {
         "Use FINALIZE only when claims have been verified and at least one grounded risk exists.",
         "Use REJECT when a core conclusion cannot be verified within the remaining budget.",
         "Do not expose chain-of-thought. reasonCode and summary must be short operational labels.",
+        "Output reasonCode as a short label of at most 80 characters. Output summary as ONE brief sentence of at most 280 characters (characters, not words); aim for under 120 characters. Do not include analysis in summary.",
       ].join("\n"),
       input: projectState(state),
       schema: ControllerDecisionSchema,

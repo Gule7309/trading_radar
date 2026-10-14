@@ -28,6 +28,13 @@ describe("Gemini adapters", () => {
     expect(serialized).not.toContain('"const"');
     expect(serialized).not.toContain('"$schema"');
     expect(serialized).toContain('"enum":["SEARCH_OFFICIAL"]');
+    // Gemini drops maxLength; retain the limit as model-visible guidance
+    // while the local Zod validator still enforces it.
+    expect(serialized).toContain("1–280 characters");
+    expect(ControllerDecisionSchema.safeParse({
+      reasonCode: "VERIFY_EVIDENCE", summary: "x".repeat(281),
+      action: { type: "VERIFY", claimIds: [] },
+    }).success).toBe(false);
   });
 
   it("extracts deduplicated cited web sources from grounding metadata", () => {
