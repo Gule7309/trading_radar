@@ -11,6 +11,23 @@ import {
   isPlaceholderSource,
 } from "./data";
 import { HardSchema } from "./contracts";
+import { failureExplanation } from "./research-failure";
+
+describe("model failure explanations", () => {
+  it("distinguishes depleted credit from temporary quota or demand failures", () => {
+    expect(
+      failureExplanation(
+        "402 RESOURCE_EXHAUSTED: Your prepayment credits are depleted.",
+      ),
+    ).toContain("預付額度已用完");
+    expect(failureExplanation("429 RESOURCE_EXHAUSTED")).toContain("額度不足");
+    expect(failureExplanation("503 UNAVAILABLE high demand")).toContain("壅塞");
+    expect(failureExplanation("no longer available to new users")).toContain(
+      "不能使用這個模型",
+    );
+    expect(failureExplanation("unknown")).toContain("尚無可發布結論");
+  });
+});
 
 describe("screening contract and evidence display", () => {
   it("compares data timestamps across time zones and rejects unparseable dates", () => {

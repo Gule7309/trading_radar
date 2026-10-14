@@ -41,6 +41,11 @@ git worktree add --detach ..\trading_radar_backend origin/feat/b-agent-mvp
 | --- | --- | --- |
 | `VITE_API_BASE` | `http://127.0.0.1:8787` | 後端根位址，不含 `/api`。 |
 | `VITE_DATA_MODE` | `mock` | `mock` 或 `live`；須與後端管理 API 的實際模式一致。 |
+| `VITE_RESEARCH_TOP_K` | `5` | 期望顯示上限，實際送出不超過研究上限（1–20）。 |
+| `VITE_RESEARCH_LIMIT` | `4` | 每輪研究上限（1–30）；首次 live 接線建議 2。 |
+| `VITE_RESEARCH_CONCURRENCY` | `4` | 同時研究檔數（1–4）；首次 live 接線建議 2。 |
+
+後端會將研究上限提高到至少 Top-K，因此前端送出 `min(TOP_K, LIMIT)` 作為 Top-K，避免 2 檔測試意外研究 5 檔。300 秒逾時維持不變。Live 模式須先匯入真實篩選 JSON，不會自動拿內建 fixture 執行研究。金鑰、真實資料下載與 Demo 流程見 [Live 接線指南](LIVE_DEMO_SETUP.md)。
 
 寫入前重新讀取後端模式，避免同一位址重啟成另一環境後誤送操作。前端不存放模型憑證。未開啟管理 API 的後端無法核對環境，因此寫入會停止並提供系統狀態入口。
 
@@ -49,7 +54,7 @@ git worktree add --detach ..\trading_radar_backend origin/feat/b-agent-mvp
 ## 可操作流程
 
 1. 「研究偏好」讀取後端預設，三步設定習慣、硬性限制與研究權重。
-2. 「選股研究」使用 A 的 8 筆 fixture，或匯入符合 repo JSON Schema 的完整 screening output。開始研究呼叫 `/api/research/screening-output`，送 `topK=5`、`researchLimit=10`、`concurrency=2`。
+2. 「選股研究」在 mock 模式可使用 A 的 8 筆 fixture，live 模式則須匯入符合 repo JSON Schema 的完整 screening output。開始研究呼叫 `/api/research/screening-output`，使用上述環境設定；本次研究與每日研究共用參數。
 3. 先搜尋或依產業篩選候選，以四項財務數據排序、勾選 2–3 檔並排比較，再進入個股總覽、證據查核、風險與失效、研究紀錄。首次使用即可看候選數據；已發布研究與篩選候選分開。比較與排序只影響閱讀，不會變更後端排名或偏好。
 4. 收藏／略過需 1–4 個原因，可填 500 字備註。成功後顯示後端實際權重差異，閱讀中的列表不改序；再研究後可比較前次順位。
 5. 收藏直接建立追蹤與論點。追蹤頁可搜尋與篩選「需重新評估」，優先看論點削弱或失效的股票；進入詳情可比較版本、查事件與來源及移除追蹤。
