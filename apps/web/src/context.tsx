@@ -55,6 +55,15 @@ function useAppState() {
   const canWrite =
     !!health.data?.ok && !health.isError && detectedMode === DATA_MODE;
   const [input, setInput] = useState<ScreeningOutput>(sample);
+  const [inputReady, setInputReady] = useState(DATA_MODE === "mock");
+  function importInput(value: ScreeningOutput) {
+    if (DATA_MODE === "live" && value.run.runId === sample.run.runId)
+      throw new Error(
+        "這是內建 fixture。Live 研究請匯入由真實資料庫重新產出的篩選 JSON。",
+      );
+    setInput(value);
+    setInputReady(true);
+  }
   const [snapshots, setSnapshots] = useState<Snapshot[]>([]);
   const [loaded, setLoaded] = useState(false);
   const [cacheError, setCacheError] = useState("");
@@ -135,6 +144,8 @@ function useAppState() {
   const research = useMutation({
     mutationFn: async () => {
       await assertWrite();
+      if (!inputReady)
+        throw new Error("請先匯入真實篩選資料，再開始 live 研究。");
       const currentProfile = await api.profile();
       client.setQueryData(["profile"], currentProfile);
       if (!hardMatches(input, currentProfile.hardConstraints))
@@ -149,9 +160,15 @@ function useAppState() {
         !document.querySelector('[role="dialog"]')
       )
         openResult();
-      toast.success(`研究完成，共 ${s.result.top.length} 檔可發布結果`, {
-        action: { label: "查看研究", onClick: openResult },
-      });
+      const notify = s.result.top.length ? toast.success : toast.warning;
+      notify(
+        s.result.top.length
+          ? `研究完成，共 ${s.result.top.length} 檔可發布結果`
+          : "本次沒有可發布結果，請查看執行原因",
+        {
+          action: { label: "查看研究", onClick: openResult },
+        },
+      );
     },
   });
   const daily = useMutation({
@@ -163,7 +180,7 @@ function useAppState() {
       const output = response.screeningOutput
         ? parseScreening(response.screeningOutput)
         : undefined;
-      if (output) setInput(output);
+      if (output) importInput(output);
       const snapshot =
         output && response.result
           ? await retain(
@@ -287,7 +304,8 @@ function useAppState() {
     detectedMode,
     canWrite,
     input,
-    setInput,
+    inputReady,
+    setInput: importInput,
     snapshots,
     loaded,
     cacheError,

@@ -10,6 +10,9 @@ import {
 } from "lucide-react";
 import { useApp } from "./context-store";
 import { api } from "./api";
+import { RESEARCH_OPTIONS } from "./research-options";
+import type { Snapshot } from "./contracts";
+import { failureExplanation, relatedFailedRun } from "./research-failure";
 import {
   date,
   hardMatches,
@@ -32,6 +35,68 @@ import { StockExplorer } from "./StockExplorer";
 import { ResearchDetail } from "./ResearchDetail";
 import s from "./app.module.css";
 import { useListNavigation } from "./useListNavigation";
+
+function BatchModelFailures({ snapshot }: { snapshot: Snapshot }) {
+  const app = useApp();
+  const failed = snapshot.result.rejectedOrSkipped.filter(
+    (item) => item.stopReason === "MODEL_FAILURE",
+  );
+  const diagnostics = useQuery({
+    queryKey: ["batch-model-failures", snapshot.id],
+    enabled: failed.length > 0 && !!app.health.data?.ok,
+    retry: false,
+    queryFn: async () =>
+      Promise.all(
+        failed.map(async (item) => {
+          const history = await api.history(item.ticker);
+          return {
+            ...item,
+            run: relatedFailedRun(
+              history.runs,
+              item.candidateId,
+              snapshot.createdAt,
+            ),
+          };
+        }),
+      ),
+  });
+  if (!failed.length) return null;
+  return (
+    <section className={s.error} role="alert">
+      <div>
+        <strong>{failed.length} 檔研究遇到模型執行問題</strong>
+        <p>
+          前後端已收到這次執行結果，但這些股票尚未產生可發布結論。模型失敗不代表股票被判定為不適合投資。
+        </p>
+        {diagnostics.isPending && <p>正在讀取相關診斷…</p>}
+        {diagnostics.isError && <p>診斷暫時無法讀取，請到系統狀態確認連線。</p>}
+        {diagnostics.data?.map((item) => (
+          <div key={item.candidateId}>
+            <p>
+              <strong>{item.ticker}</strong>：
+              {failureExplanation(
+                item.run?.result.diagnostics
+                  ?.map((d) => d.message)
+                  .join("\n") || "",
+              )}
+            </p>
+            {item.run ? (
+              <p className={s.hint}>
+                同候選最近一次失敗：{date(item.run.result.completedAt)} ·{" "}
+                <Link to={`/runs/${encodeURIComponent(item.run.runId)}`}>
+                  查看執行診斷
+                </Link>
+              </p>
+            ) : (
+              <p className={s.hint}>後端沒有可對應的歷史診斷。</p>
+            )}
+          </div>
+        ))}
+        <Link to="/system">檢查模型與連線</Link>
+      </div>
+    </section>
+  );
+}
 
 export function Research() {
   const app = useApp();
@@ -79,6 +144,7 @@ export function Research() {
             !app.canWrite ||
             !app.health.data?.batchResearch ||
             !matched ||
+            !app.inputReady ||
             busy ||
             !app.loaded
           }
@@ -87,21 +153,28 @@ export function Research() {
           {busy ? "研究處理中" : current ? "重新研究候選" : "開始本次研究"}
         </button>
       </PageHeading>
-      <div className={s.periodStrip}>
-        <span>
-          行情<strong>{data.run.priceAsOf}</strong>
-        </span>
-        <span>
-          營收<strong>{data.run.revenueAsOf}</strong>
-        </span>
-        <span>
-          財報<strong>{data.run.financialAsOf}</strong>
-        </span>
-        <span>
-          {current ? "研究完成" : "篩選執行"}
-          <strong>{date(current?.createdAt || data.run.runAt)}</strong>
-        </span>
-      </div>
+      {(current || app.inputReady) && (
+        <div className={s.periodStrip}>
+          <span>
+            行情<strong>{data.run.priceAsOf}</strong>
+          </span>
+          <span>
+            營收<strong>{data.run.revenueAsOf}</strong>
+          </span>
+          <span>
+            財報<strong>{data.run.financialAsOf}</strong>
+          </span>
+          <span>
+            {current ? "執行結果時間" : "篩選執行"}
+            <strong>{date(current?.createdAt || data.run.runAt)}</strong>
+          </span>
+        </div>
+      )}
+      <p className={s.muted}>
+        每輪最多研究 {RESEARCH_OPTIONS.researchLimit} 檔，同時處理{" "}
+        {RESEARCH_OPTIONS.concurrency} 檔， 最多顯示 {RESEARCH_OPTIONS.topK}{" "}
+        檔可發布結果。等待上限 300 秒。
+      </p>
       <details className={s.dataTools}>
         <summary>資料與研究紀錄</summary>
         <div className={s.researchTools}>
@@ -163,13 +236,14 @@ export function Research() {
         </div>
       </details>
       <ErrorBox error={fileError || app.research.error || app.daily.error} />
+      {current && <BatchModelFailures snapshot={current} />}
       {app.profile.isError && (
         <ErrorBox
           error={app.profile.error}
           retry={() => void app.profile.refetch()}
         />
       )}
-      {!matched && app.profile.data && (
+      {app.inputReady && !matched && app.profile.data && (
         <div className={s.notice}>
           <strong>目前硬性限制與輸入資料不同</strong>
           <p>
@@ -177,7 +251,7 @@ export function Research() {
           </p>
         </div>
       )}
-      {JSON.stringify(app.input) !== JSON.stringify(data) && (
+      {app.inputReady && JSON.stringify(app.input) !== JSON.stringify(data) && (
         <p className={s.notice}>
           已準備新的輸入（行情 {app.input.run.priceAsOf}、
           {app.input.candidates.length}{" "}
@@ -232,6 +306,19 @@ export function Research() {
         <Empty title="這份本機研究紀錄不存在">
           <button className={s.button} onClick={() => setParams({})}>
             返回目前研究
+          </button>
+        </Empty>
+      ) : !current && !app.inputReady ? (
+        <Empty title="先匯入真實篩選資料">
+          <p>
+            選擇從市場資料庫產出的 screening JSON，確認資料日期後再開始研究。
+          </p>
+          <button
+            className={s.primary}
+            onClick={() => fileRef.current?.click()}
+          >
+            <FileUp size={16} />
+            匯入篩選資料
           </button>
         </Empty>
       ) : (
@@ -366,15 +453,17 @@ export function Research() {
           )}
         </>
       )}
-      <details className={s.disclosure}>
-        <summary>目前待研究的篩選資料</summary>
-        <p>
-          {app.input.candidates.length} 筆候選；行情 {app.input.run.priceAsOf}
-          。來源範圍 {app.input.run.counts.universe} 檔，來源排名{" "}
-          {app.input.run.counts.ranked} 檔，並非本次全部持有或研究。
-        </p>
-        <JsonDetails title="篩選設定與資料版本" value={app.input.run} />
-      </details>
+      {app.inputReady && (
+        <details className={s.disclosure}>
+          <summary>目前待研究的篩選資料</summary>
+          <p>
+            {app.input.candidates.length} 筆候選；行情 {app.input.run.priceAsOf}
+            。來源範圍 {app.input.run.counts.universe} 檔，來源排名{" "}
+            {app.input.run.counts.ranked} 檔，並非本次全部持有或研究。
+          </p>
+          <JsonDetails title="篩選設定與資料版本" value={app.input.run} />
+        </details>
+      )}
     </>
   );
 }

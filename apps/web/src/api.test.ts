@@ -1,6 +1,28 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 import { ApiError, request } from "./api";
+import { researchOptions } from "./research-options";
+
+describe("research budget", () => {
+  it("caps topK so B cannot silently increase a two-stock trial", () => {
+    expect(
+      researchOptions({
+        VITE_RESEARCH_LIMIT: "2",
+        VITE_RESEARCH_CONCURRENCY: "2",
+      }),
+    ).toEqual({ topK: 2, researchLimit: 2, concurrency: 2 });
+    expect(researchOptions({})).toEqual({
+      topK: 4,
+      researchLimit: 4,
+      concurrency: 4,
+    });
+  });
+  it("rejects invalid settings instead of falling back to a larger paid batch", () => {
+    for (const value of ["0", "-1", "1.5", "abc", "31"])
+      expect(() => researchOptions({ VITE_RESEARCH_LIMIT: value })).toThrow();
+    expect(() => researchOptions({ VITE_RESEARCH_CONCURRENCY: "5" })).toThrow();
+  });
+});
 
 afterEach(() => {
   vi.unstubAllGlobals();

@@ -12,6 +12,7 @@ var/
 
 # Frontend
 node_modules/
+.env
 *.tsbuildinfo
 .env.local
 .env.*.local

@@ -41,3 +41,17 @@
 | 來源擷取與引用精度 | 公開 result 無 snippet/retrievedAt，據實顯示未提供。 | 如需內文查證，擴充安全可公開的摘錄、擷取時間及版本。 |
 
 前端負責展示和操作，不實作排名、publication gate、證據裁決、論點狀態判定或交易功能。
+
+## 2026-10-14 Live 接線補充（含歷史診斷）
+
+- B `b4b2902` 的 batch service 以 `max(topK, researchLimit)` 決定研究數；前端已將 Top-K 限制在設定的研究上限內，避免 5/4/4 意外跑 5 檔。
+- main 與 B 該 commit 的 Python CLI 沒有 `inspect`；B 卻呼叫 `inspect --stock-id`，單股自動刷新仍缺 A 的對應實作／分支。
+- B `verification-pipeline.test.ts:171` 風險保留測試預期 1 個、實際 2 個；需確認新增 notice risk 與既有測試的預期。adapter 的 5 個測試及 publication gate 的 7 個測試通過。
+- 已用 Release 的真實資料縮減快照產生 20 檔／80 證據並完成 A→B adapter 與前端匯入檢查。Key 已配置，2.5 對新使用者回傳 404，經 Kevin 同意改為 3.8；模型資訊 GET 成功，但內容產生先回傳 503，延後重試約 5 分鐘後連線失敗。尚無 live ResearchResult，也未送出股票研究。完整細節見 [Live 接線指南](LIVE_DEMO_SETUP.md)。
+- 後續依 Kevin 的成本要求改為 3.1 Flash-Lite：結構化輸出實測成功（1695 ms）；Google Search 實測回傳 429 額度不足。目前瓶頸為搜尋服務配額，尚未執行股票研究。
+
+### 16:42 更新：真實研究已通過
+
+額度恢復且 B 補上 controller 的 80／280 字輸出提示後，兩檔約 36.6 秒完成：2059 可發布、2305 證據不足拒絕、18 檔略過。前述 402／429 已不是本次最新執行的阻塞。前端成功顯示研究與原文連結。B 修正在 `fix/live-controller-output-limits`，commit `01eef3f`；未調整查證或發布門檻。
+
+本次另發現 A 附的 MOPS 營收來源是 `/nas/t21/` 目錄，開啟回傳 404；需要可定位股票與期別的實際來源 URL。批次拒絕結果仍缺 runId；前端只能提供同 candidateId、快照完成前的最近失敗作為相關診斷，不能保證就是該批 run。完整驗收見 [Live 指南](LIVE_DEMO_SETUP.md)。

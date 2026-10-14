@@ -1,5 +1,6 @@
 import { z } from "zod";
 import * as C from "./contracts";
+import { RESEARCH_OPTIONS } from "./research-options";
 
 export const API_BASE = (
   import.meta.env.VITE_API_BASE || "http://127.0.0.1:8787"
@@ -83,7 +84,7 @@ export const api = {
     request("/api/research/screening-output", C.BatchSchema, {
       userId: USER_ID,
       screeningOutput: input,
-      options: { topK: 5, researchLimit: 10, concurrency: 2 },
+      options: RESEARCH_OPTIONS,
     }),
   run: (id: string) =>
     request(`/api/research/runs/${encodeURIComponent(id)}`, C.StoredRunSchema),
@@ -196,7 +197,7 @@ export const api = {
           .optional(),
         notification: C.NotificationSchema.optional(),
       }),
-      { force, topK: 5, researchLimit: 10, concurrency: 2 },
+      { force, ...RESEARCH_OPTIONS },
     ),
   modelCheck: () =>
     request(

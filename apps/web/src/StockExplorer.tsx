@@ -46,7 +46,7 @@ export function StockExplorer({
   const sourceBack = useRef<HTMLButtonElement>(null);
   const sourceTrigger = useRef<HTMLElement | null>(null);
   const [scope, setScope] = useState<"research" | "candidates">(
-    snapshot ? "research" : "candidates",
+    snapshot?.result.top.length ? "research" : "candidates",
   );
   const [search, setSearch] = useState("");
   const [industry, setIndustry] = useState("");
